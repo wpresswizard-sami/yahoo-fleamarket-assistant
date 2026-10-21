@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yahoo! Auction to Flea Market Reseller Pro</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        yahoo: '#ff0033',
+                        paypay: '#ff0033',
+                        flea: '#ff3b30'
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-sans">
+
+    <!-- Top Navigation Header -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-red-600 to-amber-500 flex items-center justify-center text-white font-black text-xl shadow-md shadow-red-200">
+                    Y!
+                </div>
+                <div>
+                    <h1 class="text-base sm:text-lg font-bold text-slate-900 leading-tight">
+                        Yahoo! Auction &rarr; Flea Market Reseller Pro
+                    </h1>
+                    <p class="text-xs text-slate-500">Cross-Market Sourcing, Listing Formatter & Profit Calculator</p>
+                </div>
+            </div>
+
+            <!-- Tab Buttons -->
+            <div class="flex items-center space-x-1 sm:space-x-2 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
+                <button id="tab-btn-sourcing" onclick="switchTab('sourcing')" class="px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center space-x-1.5 bg-white text-slate-900 shadow-sm">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-red-500"></i>
+                    <span>Sourcing & Listing</span>
+                </button>
+                <button id="tab-btn-inventory" onclick="switchTab('inventory')" class="px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center space-x-1.5 text-slate-600 hover:text-slate-900">
+                    <i data-lucide="boxes" class="w-4 h-4 text-slate-500"></i>
+                    <span>Inventory & Profit</span>
+                    <span id="badge-total-items" class="bg-slate-200 text-slate-700 text-xs px-2 py-0.5 rounded-full font-bold ml-1">0</span>
+                </button>
+            </div>
+
+            <!-- Flea Market Quick Link -->
+            <div class="flex items-center space-x-2 sm:space-x-3">
+                <a href="https://paypayfleamarket.yahoo.co.jp/sell" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition shadow-sm" title="Open Yahoo! Flea Market Listing Portal">
+                    <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                    <span>Open Flea Market</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-6">
+
+        <!-- TAB 1: SOURCING & LISTING ASSISTANT -->
+        <section id="tab-sourcing" class="space-y-6">
+
+            <!-- Search / URL / Keyword Input Card -->
+            <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
+                <div class="flex flex-col md:flex-row gap-3 items-center">
+                    <div class="relative flex-1 w-full">
+                        <i data-lucide="search" class="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+                        <input type="text" id="input-url" 
+                            placeholder="Type any product keyword (e.g. iPhone, PS5, Watch, Camera) or paste Yahoo ID/URL" 
+                            onkeydown="if(event.key==='Enter') handleScrape()"
+                            class="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:bg-white transition font-medium">
+                    </div>
+                    <div class="flex gap-2 w-full md:w-auto">
+                        <button id="btn-scrape" onclick="handleScrape()" class="flex-1 md:flex-none px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-sm transition flex items-center justify-center space-x-2 shadow-md shadow-red-100 disabled:opacity-50">
+                            <i data-lucide="search" class="w-4 h-4"></i>
+                            <span>Search & Import</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Quick Keywords Row -->
+                <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 text-xs">
+                    <span class="font-bold text-slate-500 flex items-center space-x-1">
+                        <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-500"></i>
+                        <span>Popular Searches:</span>
+                    </span>
+                    <button onclick="quickSearch('Nintendo Switch')" class="px-2.5 py-1 bg-slate-100 hover:bg-red-50 hover:text-red-700 hover:border-red-200 border border-slate-200 rounded-lg font-bold text-slate-700 transition">
+                        🎮 Switch
+                    </button>
+                    <button onclick="quickSearch('iPhone 13')" class="px-2.5 py-1 bg-slate-100 hover:bg-red-50 hover:text-red-700 hover:border-red-200 border border-slate-200 rounded-lg font-bold text-slate-700 transition">
+                        📱 iPhone
+                    </button>
+                    <button onclick="quickSearch('PS5')" class="px-2.5 py-1 bg-slate-100 hover:bg-red-50 hover:text-red-700 hover:border-red-200 border border-slate-200 rounded-lg font-bold text-slate-700 transition">
+                        🕹️ PS5
+                    </button>
+                    <button onclick="quickSearch('G-Shock')" class="px-2.5 py-1 bg-slate-100 hover:bg-red-50 hover:text-red-700 hover:border-red-200 border border-slate-200 rounded-lg font-bold text-slate-700 transition">
+                        ⌚ G-Shock
+                    </button>
+                    <button onclick="quickSearch('Sony Headphones')" class="px-2.5 py-1 bg-slate-100 hover:bg-red-50 hover:text-red-700 hover:border-red-200 border border-slate-200 rounded-lg font-bold text-slate-700 transition">
+                        🎧 Headphones
+                    </button>
+                    <button onclick="quickSearch('Canon Lens')" class="px-2.5 py-1 bg-slate-100 hover:bg-red-50 hover:text-red-700 hover:border-red-200 border border-slate-200 rounded-lg font-bold text-slate-700 transition">
+                        📷 Camera Lens
+                    </button>
+                </div>
+
+                <!-- Scraping loading spinner -->
+                <div id="scrape-loading" class="hidden pt-3 border-t border-slate-100 flex items-center justify-center space-x-2 text-slate-600 text-sm">
+                    <div class="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+                    <span id="loading-text">Searching Yahoo! Auctions live...</span>
+                </div>
+
+                <!-- Live Search Results Grid (Appears on keyword search) -->
+                <div id="search-results-section" class="hidden pt-3 border-t border-slate-100 space-y-2">
+                    <div class="flex items-center justify-between text-xs font-bold text-slate-700">
+                        <span id="search-results-heading" class="flex items-center space-x-1.5 text-slate-900 font-extrabold">
+                            <i data-lucide="layout-grid" class="w-4 h-4 text-red-500"></i>
+                            <span>Yahoo! Auction Results Found:</span>
+                        </span>
+                        <span class="text-[11px] text-slate-400 font-medium">Live Yahoo! Auction time & bids</span>
+                    </div>
+
+                    <!-- Search Results Sorting & Auction Time Filters -->
+                    <div class="flex flex-wrap items-center justify-between gap-2 bg-white p-2 rounded-xl border border-slate-200">
+                        <div class="flex flex-wrap items-center gap-1.5 text-xs">
+                            <span class="text-[11px] font-bold text-slate-500 flex items-center space-x-1 mr-1">
+                                <i data-lucide="filter" class="w-3.5 h-3.5 text-slate-400"></i>
+                                <span>Auction Time & Filter:</span>
+                            </span>
+                            <button id="sort-btn-default" onclick="changeSearchSort('default')" class="px-2.5 py-1 rounded-lg text-xs font-bold transition bg-slate-900 text-white shadow-xs">
+                                🌟 All
+                            </button>
+                            <button id="sort-btn-end" onclick="changeSearchSort('end')" class="px-2.5 py-1 rounded-lg text-xs font-bold transition bg-slate-100 text-slate-700 hover:bg-amber-100 hover:text-amber-900 border border-slate-200 flex items-center space-x-1" title="Sort by auctions ending soonest">
+                                <i data-lucide="clock" class="w-3 h-3 text-amber-500"></i>
+                                <span>⏰ Ending Soonest (Jald Khatam)</span>
+                            </button>
+                            <button id="sort-btn-bids" onclick="changeSearchSort('bids')" class="px-2.5 py-1 rounded-lg text-xs font-bold transition bg-slate-100 text-slate-700 hover:bg-blue-100 hover:text-blue-900 border border-slate-200 flex items-center space-x-1" title="Sort by most bids">
+                                <i data-lucide="flame" class="w-3 h-3 text-red-500"></i>
+                                <span>🏷️ Most Bids</span>
+                            </button>
+                            <button id="sort-btn-fixed" onclick="changeSearchSort('fixed')" class="px-2.5 py-1 rounded-lg text-xs font-bold transition bg-slate-100 text-slate-700 hover:bg-emerald-100 hover:text-emerald-900 border border-slate-200 flex items-center space-x-1" title="Buy It Now items only">
+                                <i data-lucide="zap" class="w-3 h-3 text-emerald-500"></i>
+                                <span>⚡ Buy It Now</span>
+                            </button>
+                        </div>
+                        <span class="text-[11px] text-slate-400 font-medium hidden sm:inline">Click card to analyze photos & calculate profit</span>
+                    </div>
+
+                    <div id="search-results-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 max-h-80 overflow-y-auto p-1 bg-slate-50/50 rounded-xl border border-slate-200">
+                        <!-- Dynamic search result cards inserted here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- SIMPLIFIED 3-STEP ARBITRAGE PRICE FLOW BANNER -->
+            <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-5 text-white shadow-lg border border-slate-700/60">
+                <div class="text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-3 flex items-center justify-between">
+                    <span class="flex items-center space-x-1.5">
+                        <i data-lucide="arrow-right-left" class="w-4 h-4 text-emerald-400"></i>
+                        <span>Price Flow: Where to Buy &rarr; Where to Sell &rarr; Your Net Profit</span>
+                    </span>
+                    <span class="text-emerald-400 text-xs font-bold flex items-center space-x-1">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span>Live Calculation</span>
+                    </span>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <!-- Box 1: Buying Source -->
+                    <div class="bg-slate-800/90 rounded-xl p-4 border border-blue-500/40 relative flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <div class="flex items-center space-x-1.5 text-xs font-bold text-blue-300">
+                                    <span class="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center text-[10px] text-blue-300 font-black">1</span>
+                                    <span>BUY FROM: Yahoo! Auction</span>
+                                </div>
+                            </div>
+                            <div class="flex items-baseline space-x-2 mt-1">
+                                <span id="banner-buy-price" class="text-2xl sm:text-3xl font-black text-white">¥0</span>
+                                <span id="banner-inbound-ship" class="text-xs text-slate-400">(+¥0 ship)</span>
+                            </div>
+                            <div class="text-[11px] text-slate-400 mt-1.5 pt-1.5 border-t border-slate-700/60 flex justify-between">
+                                <span>Total Buying Cost:</span>
+                                <b id="banner-total-cost" class="text-blue-300 font-bold">¥0</b>
+                            </div>
+                            <div class="text-[11px] text-slate-400 mt-1.5 pt-1.5 border-t border-slate-700/60 flex items-center justify-between">
+                                <span>Auction Time Left:</span>
+                                <span id="banner-auction-time" class="text-xs font-bold text-amber-300 flex items-center space-x-1">
+                                    <i data-lucide="clock" class="w-3 h-3 text-amber-400"></i>
+                                    <span>--</span>
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Direct Link to Yahoo Auction Ad -->
+                        <div class="mt-3 pt-2 border-t border-slate-700/60 flex items-center justify-between">
+                            <span class="text-[10px] text-slate-400 font-medium">Original Auction:</span>
+                            <a id="banner-buy-link" href="#" target="_blank" class="inline-flex items-center space-x-1.5 text-xs font-bold text-blue-300 hover:text-white bg-blue-600/40 hover:bg-blue-600 px-3 py-1 rounded-lg border border-blue-400/50 transition shadow-sm" title="Open original ad on Yahoo! Auction">
+                                <span>🔗 View Yahoo Ad</span>
+                                <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Box 2: Selling Target -->
+                    <div class="bg-slate-800/90 rounded-xl p-4 border border-amber-500/40 relative flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <div class="flex items-center space-x-1.5 text-xs font-bold text-amber-300">
+                                    <span class="w-5 h-5 rounded-full bg-amber-500/20 flex items-center justify-center text-[10px] text-amber-300 font-black">2</span>
+                                    <span>SELL ON: Yahoo! Flea Market</span>
+                                </div>
+                            </div>
+                            <div class="flex items-baseline space-x-2 mt-1">
+                                <span id="banner-sell-price" class="text-2xl sm:text-3xl font-black text-amber-300">¥0</span>
+                                <span id="banner-platform" class="text-xs text-slate-400">(Fee: 5%)</span>
+                            </div>
+                            <div class="text-[11px] text-slate-400 mt-1.5 pt-1.5 border-t border-slate-700/60 flex justify-between">
+                                <span>Fee & Shipping Deducted:</span>
+                                <b id="banner-deductions" class="text-amber-200 font-bold">-¥210</b>
+                            </div>
+                        </div>
+
+                        <!-- Direct Actions: Live Ads, Past Sold History, and Post Listing -->
+                        <div class="mt-3 pt-2 border-t border-slate-700/60 space-y-1.5">
+                            <div class="grid grid-cols-2 gap-1.5">
+                                <a id="banner-flea-link" href="#" target="_blank" class="inline-flex items-center justify-center space-x-1 text-[11px] font-bold text-amber-300 hover:text-white bg-amber-500/30 hover:bg-amber-600 px-2 py-1 rounded-lg border border-amber-400/50 transition shadow-sm" title="View matching competitor live ads on Flea Market">
+                                    <span>🏷️ Live Flea Ads</span>
+                                    <i data-lucide="external-link" class="w-3 h-3"></i>
+                                </a>
+                                <a id="banner-sold-link" href="#" target="_blank" class="inline-flex items-center justify-center space-x-1 text-[11px] font-bold text-purple-300 hover:text-white bg-purple-600/30 hover:bg-purple-600 px-2 py-1 rounded-lg border border-purple-400/50 transition shadow-sm" title="Check past sold prices (Biki hui keemat) on Mercari/Flea Market">
+                                    <span>📊 Sold History</span>
+                                    <i data-lucide="badge-check" class="w-3 h-3 text-purple-300"></i>
+                                </a>
+                            </div>
+                            <a id="banner-flea-sell-link" href="https://paypayfleamarket.yahoo.co.jp/sell" target="_blank" class="w-full inline-flex items-center justify-center space-x-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 py-1 rounded-lg border border-emerald-400/60 transition shadow-sm" title="Open listing creation page on Flea Market">
+                                <span>🚀 Post on Flea Market (出品)</span>
+                                <i data-lucide="arrow-up-right" class="w-3.5 h-3.5"></i>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Box 3: Net Pocket Profit -->
+                    <div class="bg-gradient-to-br from-emerald-950/90 to-slate-900 rounded-xl p-4 border border-emerald-500/60 relative">
+                        <div class="flex items-center space-x-1.5 text-xs font-bold text-emerald-300 mb-1">
+                            <span class="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center text-[10px] text-emerald-300 font-black">3</span>
+                            <span>YOUR NET PROFIT (Munafa)</span>
+                        </div>
+                        <div class="flex items-baseline space-x-2 mt-1">
+                            <span id="banner-net-profit" class="text-2xl sm:text-3xl font-black text-emerald-400">¥0</span>
+                            <span id="banner-margin" class="text-xs font-bold text-emerald-300">(0.0% ROI)</span>
+                        </div>
+                        <div class="text-[11px] text-emerald-400/80 mt-1.5 pt-1.5 border-t border-emerald-800/60 flex justify-between">
+                            <span>Safe in your pocket:</span>
+                            <b class="text-white font-bold">100% Net Profit</b>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Content Area: Split 2 Columns -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+                <!-- Left Column (7 cols): Listing Content, Images, Title & Description -->
+                <div class="lg:col-span-7 space-y-6">
+
+                    <!-- Title Optimizer Card -->
+                    <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
+                        <div class="flex items-center justify-between">
+                            <label class="text-sm font-bold text-slate-800 flex items-center space-x-1.5">
+                                <i data-lucide="type" class="w-4 h-4 text-red-500"></i>
+                                <span>Flea Market Product Title (Limit: 40 chars)</span>
+                            </label>
+                            <span id="title-char-count" class="text-xs px-2.5 py-0.5 rounded-full font-bold bg-slate-100 text-slate-600">0 / 40 chars</span>
+                        </div>
+
+                        <!-- 1-Click Keyword Bracket Pills -->
+                        <div class="space-y-1.5">
+                            <span class="text-xs text-slate-500 font-medium">1-Click Insert at Start:</span>
+                            <div id="keyword-pills-container" class="flex flex-wrap gap-1.5">
+                                <!-- Dynamic pills inserted here -->
+                            </div>
+                        </div>
+
+                        <div class="relative">
+                            <input type="text" id="item-title" 
+                                placeholder="Enter product title or auto-fetch from Yahoo" 
+                                oninput="updateTitleCharCount()"
+                                class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:bg-white font-medium">
+                        </div>
+
+                        <div class="flex justify-between items-center pt-1">
+                            <span class="text-xs text-slate-400">※ Flea market title limit is 40 characters. Include brand/model/condition.</span>
+                            <button onclick="copyToClipboard('item-title', 'title_copied')" class="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition flex items-center space-x-1">
+                                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                                <span>Copy Title</span>
+                            </button>
+                        </div>
+
+                        <!-- Direct Ad Links Toolbar -->
+                        <div class="flex flex-wrap items-center gap-2 pt-2.5 border-t border-slate-100 text-xs">
+                            <span class="text-slate-500 font-bold text-[11px] flex items-center space-x-1">
+                                <i data-lucide="external-link" class="w-3.5 h-3.5 text-slate-400"></i>
+                                <span>Direct Links:</span>
+                            </span>
+                            <a id="link-external-yahoo" href="#" target="_blank" class="inline-flex items-center space-x-1 text-blue-700 hover:text-white bg-blue-50 hover:bg-blue-600 border border-blue-200 px-2.5 py-1 rounded-lg font-bold text-[11px] transition shadow-xs" title="Open original listing on Yahoo! Auction">
+                                <span>🛒 Yahoo Auction Ad</span>
+                                <i data-lucide="arrow-up-right" class="w-3 h-3"></i>
+                            </a>
+                            <a id="link-external-flea" href="#" target="_blank" class="inline-flex items-center space-x-1 text-amber-800 hover:text-white bg-amber-50 hover:bg-amber-600 border border-amber-200 px-2.5 py-1 rounded-lg font-bold text-[11px] transition shadow-xs" title="View matching competitor ads on Yahoo! Flea Market">
+                                <span>🏷️ Flea Market Matching Ads</span>
+                                <i data-lucide="arrow-up-right" class="w-3 h-3"></i>
+                            </a>
+                            <a id="link-external-mercari" href="#" target="_blank" class="inline-flex items-center space-x-1 text-rose-700 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 px-2.5 py-1 rounded-lg font-bold text-[11px] transition shadow-xs" title="View matching competitor ads on Mercari">
+                                <span>🔴 Mercari Matching Ads</span>
+                                <i data-lucide="arrow-up-right" class="w-3 h-3"></i>
+                            </a>
+                            <a id="link-external-sold" href="#" target="_blank" class="inline-flex items-center space-x-1 text-purple-700 hover:text-white bg-purple-50 hover:bg-purple-600 border border-purple-200 px-2.5 py-1 rounded-lg font-bold text-[11px] transition shadow-xs" title="Check exact completed sales on Mercari (売り切れ相場)">
+                                <span>📊 Mercari Sold History (売り切れ)</span>
+                                <i data-lucide="badge-check" class="w-3 h-3 text-purple-600"></i>
+                            </a>
+                            <a id="link-external-yahoo-sold" href="#" target="_blank" class="inline-flex items-center space-x-1 text-indigo-700 hover:text-white bg-indigo-50 hover:bg-indigo-600 border border-indigo-200 px-2.5 py-1 rounded-lg font-bold text-[11px] transition shadow-xs" title="Check Yahoo Auction past winning bid prices (落札相場)">
+                                <span>📈 Yahoo Past Sold Bids (落札相場)</span>
+                                <i data-lucide="arrow-up-right" class="w-3 h-3"></i>
+                            </a>
+                            <a id="link-external-sell" href="https://paypayfleamarket.yahoo.co.jp/sell" target="_blank" class="inline-flex items-center space-x-1 text-emerald-800 hover:text-white bg-emerald-50 hover:bg-emerald-600 border border-emerald-300 px-2.5 py-1 rounded-lg font-bold text-[11px] transition shadow-xs" title="Open Flea Market listing creation page">
+                                <span>🚀 Post on Flea Market (出品)</span>
+                                <i data-lucide="arrow-up-right" class="w-3 h-3"></i>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Images Gallery Card (Supports Multiple Photos) -->
+                    <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <i data-lucide="images" class="w-4 h-4 text-red-500"></i>
+                                <span class="text-sm font-bold text-slate-800">Product Photos Gallery</span>
+                                <span id="img-count-badge" class="text-xs bg-red-100 text-red-700 font-bold px-2 py-0.5 rounded-full">0 photos</span>
+                            </div>
+                            <button id="btn-download-zip" onclick="downloadImagesZip()" disabled class="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-lg transition flex items-center space-x-1.5 disabled:opacity-40">
+                                <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                                <span>Download All Photos as ZIP</span>
+                            </button>
+                        </div>
+
+                        <!-- Image Grid Container -->
+                        <div id="image-gallery" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5 min-h-[90px] p-2 bg-slate-50 rounded-xl border border-slate-200">
+                            <div class="col-span-full text-center py-6 text-slate-400 text-xs">
+                                High-resolution photos will appear here after analyzing an auction URL or clicking a sample
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Description Formatter Card -->
+                    <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <label class="text-sm font-bold text-slate-800 flex items-center space-x-1.5">
+                                <i data-lucide="file-text" class="w-4 h-4 text-red-500"></i>
+                                <span>Flea Market Description (Formatted & Cleaned)</span>
+                            </label>
+                            <!-- Template Selector Dropdown -->
+                            <div class="flex items-center space-x-2">
+                                <span class="text-xs text-slate-500">Template:</span>
+                                <select id="select-template" onchange="onTemplateChange()" class="text-xs bg-slate-100 border border-slate-300 rounded-lg px-2.5 py-1.5 font-medium focus:ring-1 focus:ring-red-500">
+                                    <option value="standard">Standard (All-Round)</option>
+                                    <option value="electronics">Electronics & Gaming</option>
+                                    <option value="fashion">Fashion & Apparel</option>
+                                    <option value="hobby">Hobby & Figures</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Notice Badge -->
+                        <div class="flex items-center space-x-2 text-xs bg-emerald-50 text-emerald-800 px-3 py-1.5 rounded-lg border border-emerald-200">
+                            <i data-lucide="check-circle-2" class="w-3.5 h-3.5 flex-shrink-0 text-emerald-600"></i>
+                            <span>Auction noise (3N rules) automatically cleaned into polite customer-friendly flea market text</span>
+                        </div>
+
+                        <textarea id="item-description" rows="11" 
+                            placeholder="Cleaned and polite flea market description ready to paste"
+                            class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-red-500 focus:bg-white"></textarea>
+
+                        <div class="flex justify-end">
+                            <button onclick="copyToClipboard('item-description', 'desc_copied')" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition flex items-center space-x-1.5 shadow-sm">
+                                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                                <span>Copy Description</span>
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Right Column (5 cols): Simple Live Profit Calculator & Inventory Save -->
+                <div class="lg:col-span-5 space-y-6">
+
+                    <!-- Live Profit Calculator Card -->
+                    <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <div class="flex items-center space-x-2">
+                                <div class="w-7 h-7 rounded-lg bg-red-100 text-red-600 flex items-center justify-center font-bold text-sm">
+                                    ¥
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-slate-800 text-sm">Live Profit & Margin Calculator</h3>
+                                </div>
+                            </div>
+                            <!-- Platform Selector -->
+                            <div class="flex space-x-1 bg-slate-100 p-1 rounded-lg">
+                                <button id="btn-platform-yahoo" onclick="setPlatform('yahoo_flea')" class="px-2.5 py-1 text-xs font-bold rounded bg-white text-red-600 shadow-sm">
+                                    Yahoo! Flea (5%)
+                                </button>
+                                <button id="btn-platform-mercari" onclick="setPlatform('mercari')" class="px-2.5 py-1 text-xs font-bold rounded text-slate-600 hover:text-slate-900">
+                                    Mercari (10%)
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Price Inputs Form Divided into Clear Buy and Sell Sections -->
+                        <div class="space-y-4">
+                            
+                            <!-- SECTION 1: BUYING (YAHOO AUCTION) -->
+                            <div class="bg-blue-50/40 p-3.5 rounded-xl border border-blue-100 space-y-2.5">
+                                <span class="text-xs font-bold text-blue-900 flex items-center space-x-1">
+                                    <span>🛒 Step 1: Buying from Yahoo! Auction</span>
+                                </span>
+                                <div class="grid grid-cols-2 gap-2.5">
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-slate-700 mb-1">
+                                            ① Auction Buy Price (¥)
+                                        </label>
+                                        <div class="relative">
+                                            <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">¥</span>
+                                            <input type="number" id="calc-buy-price" value="0" min="0" oninput="runLiveCalculation()"
+                                                class="w-full pl-6 pr-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-sm font-bold text-slate-800 focus:ring-2 focus:ring-blue-500">
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-slate-700 mb-1">
+                                            ② Shipping to You (¥)
+                                        </label>
+                                        <div class="relative">
+                                            <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">¥</span>
+                                            <input type="number" id="calc-inbound-shipping" value="0" min="0" oninput="runLiveCalculation()"
+                                                class="w-full pl-6 pr-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-sm font-bold text-slate-800 focus:ring-2 focus:ring-blue-500">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- SECTION 2: SELLING (YAHOO FLEA MARKET) -->
+                            <div class="bg-red-50/40 p-3.5 rounded-xl border border-red-100 space-y-2.5">
+                                <span class="text-xs font-bold text-red-900 flex items-center space-x-1">
+                                    <span>🏷️ Step 2: Selling on Flea Market</span>
+                                </span>
+                                <div>
+                                    <label class="block text-[11px] font-bold text-red-900 mb-1">
+                                        ③ Target Selling Price (¥)
+                                    </label>
+                                    <div class="relative">
+                                        <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-base font-bold text-red-600">¥</span>
+                                        <input type="number" id="calc-sell-price" value="0" min="0" oninput="runLiveCalculation()"
+                                            class="w-full pl-8 pr-3 py-2 bg-white border border-red-300 rounded-xl text-lg font-black text-red-600 focus:ring-2 focus:ring-red-500">
+                                    </div>
+                                </div>
+
+                                <!-- Outbound Flea Shipping Selector -->
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-700 mb-1">
+                                        ④ Shipping to Buyer
+                                    </label>
+                                    <select id="calc-shipping-method" onchange="onShippingMethodChange()" class="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-red-500">
+                                        <!-- populated dynamically -->
+                                    </select>
+                                </div>
+
+                                <!-- Custom Shipping / Packaging Cost -->
+                                <div class="grid grid-cols-2 gap-2.5">
+                                    <div>
+                                        <label class="block text-[11px] font-medium text-slate-600 mb-1">
+                                            Actual Shipping (¥)
+                                        </label>
+                                        <input type="number" id="calc-shipping-out" value="210" min="0" oninput="runLiveCalculation()"
+                                            class="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-700">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-medium text-slate-600 mb-1">
+                                            Box & Materials (¥)
+                                        </label>
+                                        <input type="number" id="calc-packaging" value="0" min="0" oninput="runLiveCalculation()"
+                                            class="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-700">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Live Calculation Result Card -->
+                        <div class="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-xl p-4 space-y-3 shadow-md">
+                            <div class="flex items-center justify-between text-xs text-slate-300">
+                                <span>Buying Cost: <b id="stat-procurement" class="text-white">¥0</b></span>
+                                <span>Fee (<span id="stat-fee-percent">5</span>%): <b id="stat-fee" class="text-white">¥0</b></span>
+                            </div>
+
+                            <div class="border-t border-slate-700 pt-2 flex items-baseline justify-between">
+                                <div>
+                                    <span class="text-xs text-slate-300 block">Estimated Net Profit</span>
+                                    <span id="stat-profit" class="text-3xl font-black text-emerald-400">¥0</span>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-xs text-slate-300 block">Profit Margin / ROI</span>
+                                    <span class="text-sm font-bold text-white">
+                                        <span id="stat-margin" class="text-emerald-400 font-bold">0.0%</span> / <span id="stat-roi">0%</span>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Quick Pricing Suggestions (Click to fill) -->
+                        <div class="space-y-1.5 pt-1">
+                            <span class="text-xs font-bold text-slate-600 block">Suggested Selling Prices (Click to apply):</span>
+                            <div class="grid grid-cols-3 gap-1.5 text-center">
+                                <button onclick="applySuggestedPrice('breakeven')" class="p-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-left transition">
+                                    <span class="text-[10px] text-slate-500 font-medium block">Breakeven (±0)</span>
+                                    <span id="sug-breakeven" class="text-xs font-bold text-slate-800">¥0</span>
+                                </button>
+                                <button onclick="applySuggestedPrice('target_1000')" class="p-1.5 bg-emerald-50/50 hover:bg-emerald-100/50 border border-emerald-200 rounded-lg text-left transition">
+                                    <span class="text-[10px] text-emerald-700 font-medium block">+1,000¥ Profit</span>
+                                    <span id="sug-1000" class="text-xs font-bold text-emerald-800">¥0</span>
+                                </button>
+                                <button onclick="applySuggestedPrice('target_2000')" class="p-1.5 bg-emerald-50/50 hover:bg-emerald-100/50 border border-emerald-200 rounded-lg text-left transition">
+                                    <span class="text-[10px] text-emerald-700 font-medium block">+2,000¥ Profit</span>
+                                    <span id="sug-2000" class="text-xs font-bold text-emerald-800">¥0</span>
+                                </button>
+                                <button onclick="applySuggestedPrice('target_3000')" class="p-1.5 bg-emerald-50/50 hover:bg-emerald-100/50 border border-emerald-200 rounded-lg text-left transition">
+                                    <span class="text-[10px] text-emerald-700 font-medium block">+3,000¥ Profit</span>
+                                    <span id="sug-3000" class="text-xs font-bold text-emerald-800">¥0</span>
+                                </button>
+                                <button onclick="applySuggestedPrice('margin_25')" class="p-1.5 bg-blue-50/50 hover:bg-blue-100/50 border border-blue-200 rounded-lg text-left transition">
+                                    <span class="text-[10px] text-blue-700 font-medium block">25% Margin</span>
+                                    <span id="sug-m25" class="text-xs font-bold text-blue-800">¥0</span>
+                                </button>
+                                <button onclick="applySuggestedPrice('margin_35')" class="p-1.5 bg-blue-50/50 hover:bg-blue-100/50 border border-blue-200 rounded-lg text-left transition">
+                                    <span class="text-[10px] text-blue-700 font-medium block">35% Margin</span>
+                                    <span id="sug-m35" class="text-xs font-bold text-blue-800">¥0</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Save to Inventory -->
+                        <div class="pt-2 border-t border-slate-100 space-y-2">
+                            <div class="flex items-center gap-2">
+                                <select id="save-status" class="w-1/3 px-2 py-2.5 bg-slate-100 border border-slate-300 rounded-xl text-xs font-bold">
+                                    <option value="watching">🎯 Watching</option>
+                                    <option value="won">🛒 Won</option>
+                                    <option value="in_stock">📦 In Stock</option>
+                                    <option value="listed" selected>🏷️ Listed</option>
+                                    <option value="sold">💰 Sold</option>
+                                </select>
+                                <button onclick="handleSaveItem()" class="flex-1 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition flex items-center justify-center space-x-1.5 shadow-sm">
+                                    <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                                    <span>Save to Inventory</span>
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+        <!-- TAB 2: INVENTORY & SALES TRACKER -->
+        <section id="tab-inventory" class="hidden space-y-6">
+
+            <!-- KPI Metric Cards -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+                    <span class="text-xs text-slate-500 font-medium block">Total Revenue (Sold)</span>
+                    <span id="kpi-revenue" class="text-xl font-black text-slate-900 block mt-1">¥0</span>
+                </div>
+                <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+                    <span class="text-xs text-slate-500 font-medium block">Total Net Profit</span>
+                    <span id="kpi-profit" class="text-xl font-black text-emerald-600 block mt-1">¥0</span>
+                </div>
+                <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+                    <span class="text-xs text-slate-500 font-medium block">Currently Listed</span>
+                    <span id="kpi-listed" class="text-xl font-black text-blue-600 block mt-1">0 items</span>
+                </div>
+                <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+                    <span class="text-xs text-slate-500 font-medium block">Inventory Cost</span>
+                    <span id="kpi-investment" class="text-xl font-black text-slate-900 block mt-1">¥0</span>
+                </div>
+                <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+                    <span class="text-xs text-slate-500 font-medium block">Avg Profit Margin</span>
+                    <span id="kpi-avg-margin" class="text-xl font-black text-emerald-600 block mt-1">0.0%</span>
+                </div>
+            </div>
+
+            <!-- Filter & Search Toolbar -->
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex flex-col sm:flex-row gap-3 items-center justify-between">
+                <!-- Status Filter Pills -->
+                <div class="flex flex-wrap gap-1.5 w-full sm:w-auto">
+                    <button onclick="setInventoryFilter('all')" id="filter-btn-all" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-900 text-white">All</button>
+                    <button onclick="setInventoryFilter('watching')" id="filter-btn-watching" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200">🎯 Watching</button>
+                    <button onclick="setInventoryFilter('won')" id="filter-btn-won" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200">🛒 Won</button>
+                    <button onclick="setInventoryFilter('in_stock')" id="filter-btn-in_stock" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200">📦 In Stock</button>
+                    <button onclick="setInventoryFilter('listed')" id="filter-btn-listed" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200">🏷️ Listed</button>
+                    <button onclick="setInventoryFilter('sold')" id="filter-btn-sold" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200">💰 Sold</button>
+                </div>
+
+                <!-- Search Input & CSV Export -->
+                <div class="flex gap-2 w-full sm:w-auto">
+                    <div class="relative flex-1 sm:w-64">
+                        <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                        <input type="text" id="inventory-search" 
+                            placeholder="Search products or notes..." 
+                            oninput="handleSearchInventory()"
+                            class="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-red-500 focus:bg-white font-medium">
+                    </div>
+                    <button onclick="exportInventoryCsv()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition flex items-center space-x-1">
+                        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                        <span>Export CSV</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Items Table / List -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                <th class="py-3 px-4">Product / Photos</th>
+                                <th class="py-3 px-3">Procurement Cost</th>
+                                <th class="py-3 px-3">Selling Price</th>
+                                <th class="py-3 px-3">Net Profit / Margin</th>
+                                <th class="py-3 px-3">Status</th>
+                                <th class="py-3 px-4 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventory-tbody" class="divide-y divide-slate-100 text-xs">
+                            <tr>
+                                <td colspan="6" class="text-center py-12 text-slate-400">
+                                    No items registered yet
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- Toast Notification Overlay -->
+    <div id="toast" class="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-xl text-xs font-medium flex items-center space-x-2 opacity-0 pointer-events-none transition-all duration-300">
+        <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i>
+        <span id="toast-message">Success</span>
+    </div>
+
+    <!-- Application Script -->
+    <script src="app.js"></script>
+</body>
+</html>
