@@ -4,13 +4,12 @@ cd /d "%~dp0"
 
 echo ====================================================================
 echo   Yahoo! Auction to Yahoo! Flea Market Reseller Assistant
-echo   ヤフオク -^> Yahoo!フリマ 転売アシスタント
+echo   Setup & Launch Script
 echo ====================================================================
 echo.
 
-:: Check python command
+:: Detect Python
 set "PYTHON_CMD="
-
 if exist "%LOCALAPPDATA%\Programs\Python\Python312\python.exe" (
     set "PYTHON_CMD=%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
 ) else (
@@ -26,16 +25,26 @@ if exist "%LOCALAPPDATA%\Programs\Python\Python312\python.exe" (
 )
 
 if "%PYTHON_CMD%"=="" (
-    echo [ERROR] Python was not found on your system!
-    echo Please install Python from https://www.python.org/
+    echo [ERROR] Python not found!
+    echo Please download and install Python (check 'Add python.exe to PATH'):
+    echo https://www.python.org/downloads/
+    echo.
     pause
     exit /b 1
 )
 
-echo [1/2] Checking Python environment...
+echo [1/3] Python detected:
 "%PYTHON_CMD%" --version
 
-echo [2/2] Starting local application server...
+echo.
+echo [2/3] Installing / verifying required libraries (fastapi, uvicorn, requests, bs4)...
+"%PYTHON_CMD%" -m pip install -r requirements.txt --quiet --disable-pip-version-check
+
+echo.
+echo [3/3] Starting Assistant Server and opening your browser...
+echo.
+echo Open this URL if browser does not pop up: http://localhost:8000
+echo.
 "%PYTHON_CMD%" server.py
 
 pause
