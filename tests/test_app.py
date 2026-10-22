@@ -10,7 +10,8 @@ class TestAppEndpoints(unittest.TestCase):
     def test_01_static_index(self):
         res = client.get("/")
         self.assertEqual(res.status_code, 200)
-        self.assertIn("ヤフオク → Yahoo!フリマ", res.text)
+        self.assertIn("Yahoo! Auction", res.text)
+        self.assertIn("Flea Market", res.text)
 
     def test_02_meta(self):
         res = client.get("/api/meta")
@@ -97,6 +98,37 @@ class TestAppEndpoints(unittest.TestCase):
         # 5. Delete item
         res_del = client.delete(f"/api/items/{item_id}")
         self.assertEqual(res_del.status_code, 200)
+
+    def test_06_sellability_metrics(self):
+        res = client.post("/api/sellability", json={
+            "query": "DELL Vostro 3580 Core i5 SSD",
+            "buy_price": 11000,
+            "target_sell_price": 16800,
+            "bids": 2
+        })
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertIn("score", data)
+        self.assertIn("units_sold_60d", data)
+        self.assertIn("turnaround_speed", data)
+        self.assertIn("sold_price_range", data)
+        self.assertIn("sweet_spot", data)
+        self.assertIn("proof_links", data)
+        self.assertIn("paypay_sold", data["proof_links"])
+        self.assertIn("velocity_breakdown", data)
+        self.assertEqual(len(data["velocity_breakdown"]), 3)
+
+    def test_07_product_suggestions(self):
+        res = client.get("/api/suggestions")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertIn("items", data)
+        items = data["items"]
+        self.assertGreaterEqual(len(items), 5)
+        # Verify first suggestion has 60d metrics
+        first = items[0]
+        self.assertIn("units_sold_60d", first)
+        self.assertIn("turnaround_speed", first)
 
 if __name__ == "__main__":
     unittest.main()
