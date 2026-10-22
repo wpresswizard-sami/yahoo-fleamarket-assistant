@@ -188,15 +188,15 @@ function renderSearchHistory(history = null) {
         const count = typeof item === 'object' && item.count ? item.count : null;
 
         const chip = document.createElement("div");
-        chip.className = "inline-flex items-center space-x-1 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200 rounded-lg text-xs font-bold transition group";
+        chip.className = "flex-shrink-0 whitespace-nowrap inline-flex items-center space-x-1.5 px-3 py-1 bg-blue-50/90 hover:bg-blue-100 text-blue-900 border border-blue-200 rounded-full text-xs font-bold transition group shadow-2xs";
         
         chip.innerHTML = `
-            <button type="button" class="flex items-center space-x-1" title="Click to search '${queryText}' again">
+            <button type="button" class="flex items-center space-x-1.5" title="Click to search '${queryText}' again">
                 <i data-lucide="clock" class="w-3 h-3 text-blue-500"></i>
                 <span>${queryText}</span>
-                ${count ? `<span class="text-[10px] bg-blue-200/80 text-blue-800 px-1.5 py-0.2 rounded-full font-bold ml-1">${count}</span>` : ''}
+                ${count ? `<span class="text-[10px] bg-blue-200/90 text-blue-800 px-1.5 py-0.2 rounded-full font-bold ml-0.5">${count}</span>` : ''}
             </button>
-            <button type="button" class="text-blue-400 hover:text-rose-600 transition ml-1 p-0.5" title="Remove '${queryText}' from history">
+            <button type="button" class="text-blue-400 hover:text-rose-600 transition p-0.5 rounded hover:bg-rose-100/50" title="Remove '${queryText}' from history">
                 <i data-lucide="x" class="w-3 h-3"></i>
             </button>
         `;
@@ -259,6 +259,69 @@ function clearSearchHistory() {
     showToast("Search history cleared");
 }
 
+// Toggle ✕ clear button inside search input
+function toggleClearSearchBtn() {
+    const input = document.getElementById("input-url");
+    const clearBtn = document.getElementById("btn-clear-input");
+    if (!input || !clearBtn) return;
+    if (input.value.trim().length > 0) {
+        clearBtn.classList.remove("hidden");
+    } else {
+        clearBtn.classList.add("hidden");
+    }
+}
+
+// Reset view cleanly to search a new product without the software disappearing
+function resetToNewSearch(updateUrl = true) {
+    const input = document.getElementById("input-url");
+    if (input) {
+        input.value = "";
+        input.focus();
+    }
+    toggleClearSearchBtn();
+
+    // Hide search results section
+    const resultsSection = document.getElementById("search-results-section");
+    if (resultsSection) {
+        resultsSection.classList.add("hidden");
+    }
+
+    activeSearchAuctionId = "";
+    currentSearchResults = [];
+
+    // Clear last active search from localStorage so next reload starts fresh
+    try {
+        localStorage.removeItem(LAST_SEARCH_KEY);
+    } catch(e) {}
+
+    // Update browser URL cleanly without page navigation
+    if (updateUrl) {
+        try {
+            const currentUrl = new URL(window.location.href);
+            currentUrl.searchParams.delete("q");
+            window.history.pushState({ type: "home" }, "", currentUrl.pathname);
+        } catch(e) {}
+    }
+
+    // Keep sample product 0 loaded in editor
+    loadSampleProduct(0);
+    renderSearchHistory();
+    showToast("Ready for new search! Type a keyword above.");
+}
+
+// Listen to browser Back/Forward navigation buttons so software NEVER disappears!
+window.addEventListener("popstate", (event) => {
+    if (event.state && event.state.query) {
+        const query = event.state.query;
+        const input = document.getElementById("input-url");
+        if (input) input.value = query;
+        toggleClearSearchBtn();
+        handleScrape(currentSearchSort, false);
+    } else {
+        resetToNewSearch(false);
+    }
+});
+
 // Restore last search upon page reload
 function restoreLastSearch() {
     try {
@@ -271,6 +334,7 @@ function restoreLastSearch() {
         if (input) {
             input.value = last.query;
         }
+        toggleClearSearchBtn();
 
         renderSearchHistory();
 
@@ -282,7 +346,7 @@ function restoreLastSearch() {
             showToast(`Restored search for "${last.query}" (${last.items.length} items)`);
             return true;
         } else {
-            handleScrape();
+            handleScrape(currentSearchSort, false);
             return true;
         }
     } catch (e) {
@@ -295,17 +359,30 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (window.lucide) {
         try { lucide.createIcons(); } catch(e) {}
     }
+    toggleClearSearchBtn();
     renderSearchHistory();
     await loadMetadata();
     await loadInventory();
     await loadStats();
 
-    // Check if user had a previous search before reload!
+    // 1. Check if URL contains ?q=query
+    const urlParams = new URLSearchParams(window.location.search);
+    const qFromUrl = urlParams.get("q");
+    if (qFromUrl) {
+        const input = document.getElementById("input-url");
+        if (input) input.value = qFromUrl;
+        toggleClearSearchBtn();
+        handleScrape(currentSearchSort, false);
+        return;
+    }
+
+    // 2. Check if user had a previous search before reload!
     const restored = restoreLastSearch();
     if (!restored) {
         // Only load first sample product if there is no previous search to restore
         loadSampleProduct(0);
     }
+    toggleClearSearchBtn();
 });
 
 // Render Keyword Pills
@@ -482,14 +559,23 @@ function changeSearchSort(sortType) {
 }
 
 // Handle Search or Direct Auction Scrape
-async function handleScrape(sort = currentSearchSort) {
+async function handleScrape(sort = currentSearchSort, pushHistory = true) {
     const urlInput = document.getElementById("input-url");
     let queryVal = urlInput ? urlInput.value.trim() : "";
+    toggleClearSearchBtn();
     
     // Auto-fill sample if user clicked scrape with an empty input box
     if (!queryVal) {
         loadSampleProduct(0);
         return;
+    }
+
+    if (pushHistory) {
+        try {
+            const currentUrl = new URL(window.location.href);
+            currentUrl.searchParams.set("q", queryVal);
+            window.history.pushState({ type: "search", query: queryVal }, "", currentUrl.toString());
+        } catch(e) {}
     }
 
     const btn = document.getElementById("btn-scrape");
@@ -1625,3 +1711,5 @@ window.translateDescToggle = translateDescToggle;
 window.clearSearchHistory = clearSearchHistory;
 window.removeSearchHistoryItem = removeSearchHistoryItem;
 window.restoreLastSearch = restoreLastSearch;
+window.resetToNewSearch = resetToNewSearch;
+window.toggleClearSearchBtn = toggleClearSearchBtn;
