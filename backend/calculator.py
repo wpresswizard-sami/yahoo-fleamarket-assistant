@@ -4,70 +4,70 @@ from typing import Dict, Any, Optional
 SHIPPING_METHODS = [
     {
         "id": "nekopos",
-        "name": "おてがる配送 ネコポス (ヤマト運輸)",
+        "name": "Nekopos (Yamato) - A4, up to 3cm / 1kg",
         "cost": 210,
-        "max_size": "A4・厚さ3cm・重さ1kg以内",
-        "desc": "小物、本、薄手の衣類、スマホケース、トレカなど"
+        "max_size": "A4 / 3cm thick / up to 1kg",
+        "desc": "Small electronics, accessories, games, books, trading cards"
     },
     {
         "id": "yu_packet_post",
-        "name": "おてがる配送 ゆうパケットポスト",
+        "name": "Yu-Packet Post - Standard Postbox Slot",
         "cost": 215,
-        "max_size": "専用シール貼付・郵便ポストに入る厚さ (約3.5~4cm)・重さ2kg以内",
-        "desc": "衣類、コミックセット、厚みのある小物など"
+        "max_size": "Postbox slot (~3.5-4cm) / up to 2kg",
+        "desc": "Thick clothing, manga sets, books, boxed small accessories"
     },
     {
         "id": "takkyubin_compact",
-        "name": "おてがる配送 宅急便コンパクト (箱代込)",
-        "cost": 520,  # 450円送料 + 70円専用箱代
-        "max_size": "専用BOX (25×20×5cm) / 薄型BOX",
-        "desc": "小型家電、財布、化粧品、厚手の服、ゲームソフト複数"
+        "name": "Takkyubin Compact (Dedicated Box Included)",
+        "cost": 520,  # 450 shipping + 70 box
+        "max_size": "Dedicated Box (25x20x5cm) / up to 2kg",
+        "desc": "Small electronics, watches, wallets, perfumes, games"
     },
     {
         "id": "takkyubin_60",
-        "name": "おてがる配送 宅急便 60サイズ",
+        "name": "Takkyubin 60 Size - Up to 60cm total",
         "cost": 750,
-        "max_size": "3辺合計60cm・重さ2kg以内",
-        "desc": "靴、厚手のアウター、小型フィギュア、バッグなど"
+        "max_size": "Total 3 sides 60cm / up to 2kg",
+        "desc": "Shoes, folded jackets, camera bodies, figures, bags"
     },
     {
         "id": "takkyubin_80",
-        "name": "おてがる配送 宅急便 80サイズ",
+        "name": "Takkyubin 80 Size - Up to 80cm total",
         "cost": 850,
-        "max_size": "3辺合計80cm・重さ5kg以内",
-        "desc": "スニーカー箱、中型家電、ヘルメット、コートなど"
+        "max_size": "Total 3 sides 80cm / up to 5kg",
+        "desc": "Sneaker boxes, mid-size electronics, winter coats, helmets"
     },
     {
         "id": "takkyubin_100",
-        "name": "おてがる配送 宅急便 100サイズ",
+        "name": "Takkyubin 100 Size - Up to 100cm total",
         "cost": 1050,
-        "max_size": "3辺合計100cm・重さ10kg以内",
-        "desc": "ゲーム機本体セット、中型モニター、アパレルまとめ売りなど"
+        "max_size": "Total 3 sides 100cm / up to 10kg",
+        "desc": "Gaming consoles (PS5/Switch boxed), monitors, audio bundles"
     },
     {
         "id": "custom",
-        "name": "カスタム送料 (手動入力)",
+        "name": "Custom Shipping (Manual Input)",
         "cost": 0,
-        "max_size": "自由設定",
-        "desc": "定形外、レターパック、大型配送など"
+        "max_size": "Custom",
+        "desc": "LetterPack, oversized parcels, courier services"
     }
 ]
 
 PLATFORM_FEES = {
     "yahoo_flea": {
-        "name": "Yahoo! フリマ (旧PayPayフリマ)",
+        "name": "Yahoo! Flea Market (5% Fee)",
         "rate": 0.05,
-        "desc": "販売手数料 5% (業界最安水準)"
+        "desc": "Platform fee 5% (lowest marketplace fee in Japan)"
     },
     "mercari": {
-        "name": "メルカリ (Mercari)",
+        "name": "Mercari Japan (10% Fee)",
         "rate": 0.10,
-        "desc": "販売手数料 10%"
+        "desc": "Platform fee 10% (largest buyer traffic in Japan)"
     },
     "rakuma": {
-        "name": "楽天ラクマ (Rakuma)",
-        "rate": 0.066, # 基本約6.6% (利用実績により変動)
-        "desc": "販売手数料 6.6% (最大10%)"
+        "name": "Rakuten Rakuma (6.6% Fee)",
+        "rate": 0.066,
+        "desc": "Platform fee 6.6%"
     }
 }
 

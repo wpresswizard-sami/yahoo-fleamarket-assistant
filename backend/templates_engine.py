@@ -31,9 +31,108 @@ KEYWORD_PILLS = [
 ]
 
 TEMPLATES = {
+    "standard_en": {
+        "id": "standard_en",
+        "name": "Standard Listing (English)",
+        "render": lambda title, condition, desc: f"""Thank you for viewing this listing!
+Instant purchase is welcome! ✨
+
+[Product Name]
+{title}
+
+[Condition]
+{condition}
+Clean and well maintained, no major scratches or damages.
+*Please inspect all attached photos for details.
+
+[Item Details & Description]
+{desc}
+
+[Shipping & Handling]
+• Secure anonymous tracked shipping
+• Carefully wrapped in protective bubble wrap and waterproof packaging
+• Dispatched promptly within 24 to 48 hours
+
+[Additional Notes]
+• From a smoke-free and pet-free environment.
+• Feel free to ask any questions in the comments!
+"""
+    },
+    "electronics_en": {
+        "id": "electronics_en",
+        "name": "Electronics & Gaming (English)",
+        "render": lambda title, condition, desc: f"""Thank you for visiting!
+We ensure prompt, secure, and professional transactions.
+
+[Product Name]
+{title}
+
+[Item Condition & Testing]
+Condition Rank: {condition}
+Fully powered on and operation confirmed.
+Cleaned and sanitized before packing.
+
+[Included Accessories]
+• Everything shown in the photos is included.
+
+[Description]
+{desc}
+
+[Packaging & Delivery]
+• Precision device securely packed with thick bubble wrap inside a sturdy cardboard box.
+• Fast dispatch within 24 hours via tracked delivery.
+
+Instant buy is welcome! Thank you.
+"""
+    },
+    "fashion_en": {
+        "id": "fashion_en",
+        "name": "Fashion & Apparel (English)",
+        "render": lambda title, condition, desc: f"""Thank you for checking out this item!
+Followers and instant purchases welcome! ✨
+
+[Brand & Product]
+{title}
+
+[Condition]
+{condition}
+Clean with minimal signs of wear, ready for long-term use.
+
+[Description & Sizing]
+{desc}
+
+[Packaging & Shipping]
+• Neatly folded and protected in waterproof packaging.
+• Shipped within 1 to 2 days with tracking number.
+
+Thank you!
+"""
+    },
+    "hobby_en": {
+        "id": "hobby_en",
+        "name": "Collectibles & Hobby (English)",
+        "render": lambda title, condition, desc: f"""Thank you for viewing!
+
+[Item Name]
+{title}
+
+[Condition]
+{condition}
+Stored carefully in a dark, dust-free collection space.
+
+[Description]
+{desc}
+
+[Packaging & Shipping]
+• Valuable collectible: securely protected with cardboard reinforcements and thick bubble wrap against bends and moisture.
+• Fast, tracked shipping.
+
+Available for immediate purchase, first come first served!
+"""
+    },
     "standard": {
         "id": "standard",
-        "name": "万能・標準テンプレート (即購入OK)",
+        "name": "Standard Flea Market (Japanese)",
         "render": lambda title, condition, desc: f"""ご覧いただきありがとうございます！
 即購入大歓迎・無言購入もOKです✨
 
@@ -60,7 +159,7 @@ TEMPLATES = {
     },
     "electronics": {
         "id": "electronics",
-        "name": "家電・ゲーム・ガジェット専用",
+        "name": "Electronics & Gaming (Japanese)",
         "render": lambda title, condition, desc: f"""ご覧いただきありがとうございます！
 迅速・丁寧なお取引を心掛けております。
 
@@ -87,7 +186,7 @@ TEMPLATES = {
     },
     "fashion": {
         "id": "fashion",
-        "name": "ファッション・アパレル・靴専用",
+        "name": "Fashion & Apparel (Japanese)",
         "render": lambda title, condition, desc: f"""ご覧いただきありがとうございます！
 フォロワー様・即購入大歓迎です✨
 
@@ -113,7 +212,7 @@ TEMPLATES = {
     },
     "hobby": {
         "id": "hobby",
-        "name": "ホビー・フィギュア・トレカ専用",
+        "name": "Hobby & Figures (Japanese)",
         "render": lambda title, condition, desc: f"""ご覧いただきありがとうございます！
 
 【商品名】

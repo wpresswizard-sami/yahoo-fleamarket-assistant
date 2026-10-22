@@ -1,29 +1,32 @@
 // Yahoo! Auction to Flea Market Reseller Pro - Frontend Application Logic
 
 const PILL_TRANSLATIONS = {
-    "【極美品】": "【極美品】 (Mint)",
-    "【新品未使用】": "【新品未使用】 (New)",
-    "【送料無料】": "【送料無料】 (Free Ship)",
-    "【即購入OK】": "【即購入OK】 (Instant Buy)",
-    "【24時間以内発送】": "【24時間以内発送】 (Fast Ship)",
-    "【匿名配送】": "【匿名配送】 (Anonymous)",
-    "【限定特価】": "【限定特価】 (Sale)",
-    "【おまけ付】": "【おまけ付】 (Bonus)",
-    "【動作確認済】": "【動作確認済】 (Tested)",
-    "【正規品】": "【正規品】 (Authentic)"
+    "【極美品】": "[Mint Condition]",
+    "【新品未使用】": "[Brand New]",
+    "【送料無料】": "[Free Shipping]",
+    "【即購入OK】": "[Instant Buy OK]",
+    "【24時間以内発送】": "[Fast 24h Ship]",
+    "【匿名配送】": "[Anonymous Delivery]",
+    "【限定特価】": "[Special Sale]",
+    "【おまけ付】": "[Bonus Included]",
+    "【動作確認済】": "[Operation Tested]",
+    "【正規品】": "[100% Authentic]"
 };
 
-// Rich Sample Products (Each with Multiple Photos, Proven Profit & Formatted Listing)
+// Rich Sample Products (Each with Multiple Photos, Proven Profit & Formatted Listing in English)
 const SAMPLE_PRODUCTS = [
     {
         name: "Nintendo Switch OLED",
-        title: "Nintendo Switch (有機ELモデル) Joy-Con ホワイト 美品 完品",
+        title: "Nintendo Switch OLED White Joy-Con - Complete Box, Mint Condition",
+        title_ja: "Nintendo Switch (有機ELモデル) Joy-Con ホワイト 美品 完品",
         buy_price: 24000,
         estimated_inbound_shipping: 0,
         sell_price: 31500,
         shipping_out: 750,
-        condition: "目立った傷や汚れなし",
-        description: "動作確認済み、本体およびJoy-Con・ドック・ケーブル類すべて揃っております。画面にはガラスフィルムを貼っていたためキズ等なく非常に綺麗な状態です。丁寧かつ迅速に発送いたします。",
+        condition: "Near Mint / No Scratches",
+        condition_ja: "目立った傷や汚れなし",
+        description: "Operation confirmed. Main console, Joy-Cons, dock, HDMI and AC adapter are fully included. Tempered glass screen protector applied from day one, screen is spotless with zero scratches. Sanitized and packed for fast dispatch.",
+        description_ja: "動作確認済み、本体およびJoy-Con・ドック・ケーブル類すべて揃っております。画面にはガラスフィルムを貼っていたためキズ等なく非常に綺麗な状態です。丁寧かつ迅速に発送いたします。",
         images: [
             "https://images.unsplash.com/photo-1578303512597-81e6cc155b3e?w=800&q=80",
             "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=800&q=80",
@@ -33,13 +36,16 @@ const SAMPLE_PRODUCTS = [
     },
     {
         name: "Casio G-Shock",
-        title: "CASIO G-SHOCK GW-M5610U 電波ソーラー ブラック 極美品",
+        title: "CASIO G-SHOCK GW-M5610U Solar Radio Multi-Band 6 Black - Mint",
+        title_ja: "CASIO G-SHOCK GW-M5610U 電波ソーラー ブラック 極美品",
         buy_price: 8000,
         estimated_inbound_shipping: 0,
         sell_price: 13500,
         shipping_out: 210,
-        condition: "未使用に近い",
-        description: "コレクション整理のため出品いたします。電波受信・ソーラー充電ともに正常稼働中。箱・取扱説明書完備。目立った傷やスレのない極美品です。",
+        condition: "Like New / Pristine",
+        condition_ja: "未使用に近い",
+        description: "Listing from personal collection. Radio time reception and solar charging operating flawlessly. Comes complete with original box and manual. Clean with zero noticeable scratches or scuffs.",
+        description_ja: "コレクション整理のため出品いたします。電波受信・ソーラー充電ともに正常稼働中。箱・取扱説明書完備。目立った傷やスレのない極美品です。",
         images: [
             "https://images.unsplash.com/photo-1524805444758-089113d48a6d?w=800&q=80",
             "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=800&q=80",
@@ -50,13 +56,16 @@ const SAMPLE_PRODUCTS = [
     },
     {
         name: "Sony Headphones",
-        title: "Sony WH-1000XM4 ワイヤレス ノイズキャンセリング ヘッドホン ブラック",
+        title: "Sony WH-1000XM4 Wireless Noise Cancelling Headphones Black",
+        title_ja: "Sony WH-1000XM4 ワイヤレス ノイズキャンセリング ヘッドホン ブラック",
         buy_price: 16000,
         estimated_inbound_shipping: 0,
         sell_price: 23000,
         shipping_out: 520,
-        condition: "目立った傷や汚れなし",
-        description: "高音質ノイズキャンセリングヘッドホンです。バッテリー持ちも良好で目立つ汚れはありません。専用ケース、航空機アダプタ、充電ケーブル付属。即購入大歓迎です。",
+        condition: "Very Good Condition",
+        condition_ja: "目立った傷や汚れなし",
+        description: "Premium sound quality and active noise cancellation. Battery health is great, ear pads and headband are clean without wear. Comes with carrying case, airplane adapter, and USB-C cable. Instant purchase is welcome.",
+        description_ja: "高音質ノイズキャンセリングヘッドホンです。バッテリー持ちも良好で目立つ汚れはありません。専用ケース、航空機アダプタ、充電ケーブル付属。即購入大歓迎です。",
         images: [
             "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&q=80",
             "https://images.unsplash.com/photo-1484704849700-f032a568e944?w=800&q=80",
@@ -66,13 +75,16 @@ const SAMPLE_PRODUCTS = [
     },
     {
         name: "Canon Lens",
-        title: "Canon 単焦点レンズ EF 50mm F1.8 STM フィルター・フード付 美品",
+        title: "Canon EF 50mm F1.8 STM Prime Lens with Filter & Hood - Sharp & Clean",
+        title_ja: "Canon 単焦点レンズ EF 50mm F1.8 STM フィルター・フード付 美品",
         buy_price: 14000,
         estimated_inbound_shipping: 0,
         sell_price: 20500,
         shipping_out: 520,
-        condition: "目立った傷や汚れなし",
-        description: "ポートレートや日常スナップに最適な明るい単焦点レンズです。くもり・カビ等なくクリアな光学系です。前後キャップ、レンズフード、プロテクトフィルターをお付けします。",
+        condition: "Clean Optics / Very Good",
+        condition_ja: "目立った傷や汚れなし",
+        description: "Bright prime lens perfect for portraits and everyday photography with smooth bokeh. Optics are pristine with no haze or fungus. Includes front/rear lens caps, ES-68 lens hood, and UV protection filter.",
+        description_ja: "ポートレートや日常スナップに最適な明るい単焦点レンズです。くもり・カビ等なくクリアな光学系です。前後キャップ、レンズフード、プロテクトフィルターをお付けします。",
         images: [
             "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80",
             "https://images.unsplash.com/photo-1502920917128-1aa500764cbd?w=800&q=80",
@@ -452,7 +464,7 @@ function renderSearchResults(items, query) {
                 <a href="${fleaSearchUrl}" target="_blank" onclick="event.stopPropagation()" class="py-1 px-0.5 bg-amber-50 hover:bg-amber-600 hover:text-white text-amber-800 rounded-md font-bold transition flex items-center justify-center space-x-0.5 border border-amber-200 shadow-xs" title="Open live competitor ads on Yahoo! Flea Market">
                     <span>🏷️ Flea</span>
                 </a>
-                <a href="https://jp.mercari.com/search?keyword=${encodedTitle}&status=sold_out" target="_blank" onclick="event.stopPropagation()" class="py-1 px-0.5 bg-purple-50 hover:bg-purple-600 hover:text-white text-purple-700 rounded-md font-bold transition flex items-center justify-center space-x-0.5 border border-purple-200 shadow-xs" title="Check past sold prices (Biki hui keemat) on Mercari">
+                <a href="https://jp.mercari.com/search?keyword=${encodedTitle}&status=sold_out" target="_blank" onclick="event.stopPropagation()" class="py-1 px-0.5 bg-purple-50 hover:bg-purple-600 hover:text-white text-purple-700 rounded-md font-bold transition flex items-center justify-center space-x-0.5 border border-purple-200 shadow-xs" title="Check past completed sales on Mercari">
                     <span>📊 Sold</span>
                 </a>
             </div>
@@ -589,7 +601,7 @@ function updateExternalLinks(data) {
     const bannerSoldLink = document.getElementById("banner-sold-link");
     if (bannerSoldLink) {
         bannerSoldLink.href = mercariSoldUrl;
-        bannerSoldLink.title = `Check completed sales (Biki hui keemat) for "${cleanSearchTitle}" on Mercari`;
+        bannerSoldLink.title = `Check completed sales and market price for "${cleanSearchTitle}" on Mercari`;
     }
 
     const bannerSellLink = document.getElementById("banner-flea-sell-link");
@@ -775,12 +787,105 @@ function updateTitleCharCount() {
     }
 }
 
-// Insert Keyword Bracket Pill into Title
+// 1-Click Translation States & Cache
+let isTitleTranslated = false;
+let isDescTranslated = false;
+let originalTitleCache = "";
+let originalDescCache = "";
+
+// Translate Title between English and Japanese
+async function translateTitleToggle() {
+    const titleInput = document.getElementById("item-title");
+    const label = document.getElementById("label-translate-title");
+    if (!titleInput) return;
+
+    if (!isTitleTranslated) {
+        originalTitleCache = titleInput.value;
+        if (!originalTitleCache.trim()) {
+            showToast("Please enter or load a title first", true);
+            return;
+        }
+        if (label) label.innerText = "⏳ Translating...";
+        try {
+            const res = await fetch("/api/translate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ text: originalTitleCache, target_lang: "en" })
+            });
+            const data = await res.json();
+            if (data.translated) {
+                titleInput.value = data.translated;
+                updateTitleCharCount();
+                isTitleTranslated = true;
+                if (label) label.innerText = "🇯🇵 Show Japanese";
+                showToast("Title translated to English!");
+            } else {
+                if (label) label.innerText = "🌐 Translate to English";
+            }
+        } catch (e) {
+            if (label) label.innerText = "🌐 Translate to English";
+            showToast("Translation error: " + e.message, true);
+        }
+    } else {
+        if (originalTitleCache) {
+            titleInput.value = originalTitleCache;
+            updateTitleCharCount();
+        }
+        isTitleTranslated = false;
+        if (label) label.innerText = "🌐 Translate to English";
+        showToast("Switched back to original Japanese title");
+    }
+}
+
+// Translate Description between English and Japanese
+async function translateDescToggle() {
+    const descInput = document.getElementById("item-description");
+    const label = document.getElementById("label-translate-desc");
+    if (!descInput) return;
+
+    if (!isDescTranslated) {
+        originalDescCache = descInput.value;
+        if (!originalDescCache.trim()) {
+            showToast("Please enter or load a description first", true);
+            return;
+        }
+        if (label) label.innerText = "⏳ Translating...";
+        try {
+            const res = await fetch("/api/translate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ text: originalDescCache, target_lang: "en" })
+            });
+            const data = await res.json();
+            if (data.translated) {
+                descInput.value = data.translated;
+                isDescTranslated = true;
+                if (label) label.innerText = "🇯🇵 Show Japanese";
+                showToast("Description translated to English!");
+            } else {
+                if (label) label.innerText = "🌐 Translate to English";
+            }
+        } catch (e) {
+            if (label) label.innerText = "🌐 Translate to English";
+            showToast("Translation error: " + e.message, true);
+        }
+    } else {
+        if (originalDescCache) {
+            descInput.value = originalDescCache;
+        }
+        isDescTranslated = false;
+        if (label) label.innerText = "🌐 Translate to English";
+        showToast("Switched back to original Japanese description");
+    }
+}
+
+// Insert Keyword Bracket Pill into Title (Clean English or Japanese Tag)
 function insertKeywordPill(pill) {
     const input = document.getElementById("item-title");
     if (!input) return;
-    if (!input.value.includes(pill)) {
-        input.value = `${pill} ${input.value}`.trim();
+    const tag = PILL_TRANSLATIONS[pill] || pill;
+    if (!input.value.includes(tag) && !input.value.includes(pill)) {
+        input.value = `${tag} ${input.value}`.trim();
         updateTitleCharCount();
     }
 }
@@ -1326,3 +1431,5 @@ window.updateItemStatus = updateItemStatus;
 window.deleteItem = deleteItem;
 window.loadItemToEditor = loadItemToEditor;
 window.insertKeywordPill = insertKeywordPill;
+window.translateTitleToggle = translateTitleToggle;
+window.translateDescToggle = translateDescToggle;

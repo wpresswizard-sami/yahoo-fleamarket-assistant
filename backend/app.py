@@ -1,5 +1,8 @@
 import os
 import io
+import json
+import urllib.request
+import urllib.parse
 import zipfile
 import requests
 from fastapi import FastAPI, HTTPException, Query
@@ -117,6 +120,11 @@ class DownloadZipRequest(BaseModel):
     auction_id: str
     images: List[str]
 
+class TranslateRequest(BaseModel):
+    text: str
+    target_lang: Optional[str] = "en"
+    source_lang: Optional[str] = "auto"
+
 # API Endpoints
 @app.post("/api/search")
 def api_search(req: SearchRequest):
@@ -133,15 +141,15 @@ def api_search(req: SearchRequest):
 @app.post("/api/scrape")
 def api_scrape(req: ScrapeRequest):
     if not req.url.strip():
-        raise HTTPException(status_code=400, detail="URLまたはオークションIDを入力してください")
+        raise HTTPException(status_code=400, detail="Please enter a valid Yahoo! Auction URL or Auction ID")
     
     result = scrape_yahoo_auction(req.url)
     if not result.get("success"):
-        raise HTTPException(status_code=400, detail=result.get("error", "取得に失敗しました"))
+        raise HTTPException(status_code=400, detail=result.get("error", "Failed to retrieve auction details"))
     
-    # Generate initial suggested flea market description
+    # Generate initial suggested flea market description (English standard)
     formatted_desc = generate_flea_description(
-        "standard",
+        "standard_en",
         result.get("title", ""),
         result.get("condition", ""),
         result.get("description", "")
@@ -159,6 +167,21 @@ def api_scrape(req: ScrapeRequest):
     )
     result["suggestions"] = suggestions
     return result
+
+@app.post("/api/translate")
+def api_translate(req: TranslateRequest):
+    text = req.text.strip()
+    if not text:
+        return {"translated": ""}
+    try:
+        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl={req.source_lang or 'auto'}&tl={req.target_lang or 'en'}&dt=t&q=" + urllib.parse.quote(text)
+        req_obj = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req_obj, timeout=8) as res:
+            data = json.loads(res.read().decode("utf-8"))
+            translated = "".join([part[0] for part in data[0] if part[0]])
+            return {"translated": translated}
+    except Exception as e:
+        return {"translated": text, "error": str(e)}
 
 @app.post("/api/calculate")
 def api_calculate(req: CalculateRequest):
@@ -231,14 +254,14 @@ def api_create_item(req: ItemCreateRequest):
 def api_get_item(item_id: int):
     item = get_item(item_id)
     if not item:
-        raise HTTPException(status_code=404, detail="商品が見つかりません")
+        raise HTTPException(status_code=404, detail="Product not found in inventory")
     return item
 
 @app.put("/api/items/{item_id}")
 def api_update_item(item_id: int, req: ItemUpdateRequest):
     existing = get_item(item_id)
     if not existing:
-        raise HTTPException(status_code=404, detail="商品が見つかりません")
+        raise HTTPException(status_code=404, detail="Product not found in inventory")
     
     update_data = {k: v for k, v in req.model_dump().items() if v is not None}
     

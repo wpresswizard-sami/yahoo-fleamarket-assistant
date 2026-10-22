@@ -53,7 +53,7 @@ def scrape_yahoo_auction(url_or_id: str) -> Dict[str, Any]:
         if response.status_code != 200:
             return {
                 "success": False,
-                "error": f"Yahoo!オークションからページを取得できませんでした (Status: {response.status_code})",
+                "error": f"Could not retrieve page from Yahoo! Auctions (Status: {response.status_code})",
                 "auction_id": auc_id,
                 "url": target_url
             }
@@ -293,14 +293,14 @@ def scrape_yahoo_auction(url_or_id: str) -> Dict[str, Any]:
     except requests.exceptions.RequestException as e:
         return {
             "success": False,
-            "error": f"通信エラーが発生しました: {str(e)}",
+            "error": f"Network communication error: {str(e)}",
             "auction_id": auc_id,
             "url": target_url
         }
     except Exception as e:
         return {
             "success": False,
-            "error": f"解析中にエラーが発生しました: {str(e)}",
+            "error": f"Failed to parse auction details: {str(e)}",
             "auction_id": auc_id,
             "url": target_url
         }
