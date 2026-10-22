@@ -119,17 +119,193 @@ let currentSuggestions = {};
 let inventoryFilter = "all";
 let inventorySearchQuery = "";
 
+const SEARCH_HISTORY_KEY = "reseller_search_history_v1";
+const LAST_SEARCH_KEY = "reseller_last_search_v1";
+
+// Get search history from localStorage
+function getLocalSearchHistory() {
+    try {
+        const raw = localStorage.getItem(SEARCH_HISTORY_KEY);
+        return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+        return [];
+    }
+}
+
+// Save a search to history and remember as last active search
+function saveSearchToHistory(query, resultsCount = 0, items = []) {
+    if (!query || !query.trim()) return;
+    const cleanQuery = query.trim();
+
+    // 1. Save last search state with items so reload restores everything!
+    try {
+        localStorage.setItem(LAST_SEARCH_KEY, JSON.stringify({
+            query: cleanQuery,
+            resultsCount: resultsCount,
+            items: items || [],
+            timestamp: Date.now()
+        }));
+    } catch (e) {}
+
+    // 2. Update list of recent searches (unique, max 12)
+    let history = getLocalSearchHistory();
+    history = history.filter(h => (typeof h === 'string' ? h : h.query).toLowerCase() !== cleanQuery.toLowerCase());
+    history.unshift({
+        query: cleanQuery,
+        count: resultsCount,
+        timestamp: Date.now()
+    });
+    if (history.length > 12) history = history.slice(0, 12);
+
+    try {
+        localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(history));
+    } catch (e) {}
+
+    renderSearchHistory(history);
+}
+
+// Render search history chips in the UI
+function renderSearchHistory(history = null) {
+    const container = document.getElementById("search-history-container");
+    const chipsBox = document.getElementById("search-history-chips");
+    if (!container || !chipsBox) return;
+
+    if (!history) {
+        history = getLocalSearchHistory();
+    }
+
+    if (!history || history.length === 0) {
+        container.classList.add("hidden");
+        chipsBox.innerHTML = "";
+        return;
+    }
+
+    container.classList.remove("hidden");
+    chipsBox.innerHTML = "";
+
+    history.forEach(item => {
+        const queryText = typeof item === 'string' ? item : item.query;
+        const count = typeof item === 'object' && item.count ? item.count : null;
+
+        const chip = document.createElement("div");
+        chip.className = "inline-flex items-center space-x-1 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200 rounded-lg text-xs font-bold transition group";
+        
+        chip.innerHTML = `
+            <button type="button" class="flex items-center space-x-1" title="Click to search '${queryText}' again">
+                <i data-lucide="clock" class="w-3 h-3 text-blue-500"></i>
+                <span>${queryText}</span>
+                ${count ? `<span class="text-[10px] bg-blue-200/80 text-blue-800 px-1.5 py-0.2 rounded-full font-bold ml-1">${count}</span>` : ''}
+            </button>
+            <button type="button" class="text-blue-400 hover:text-rose-600 transition ml-1 p-0.5" title="Remove '${queryText}' from history">
+                <i data-lucide="x" class="w-3 h-3"></i>
+            </button>
+        `;
+
+        // Click on query -> triggers search
+        const searchBtn = chip.querySelector("button:first-child");
+        searchBtn.onclick = () => quickSearch(queryText);
+
+        // Click on X -> removes item
+        const removeBtn = chip.querySelector("button:last-child");
+        removeBtn.onclick = (e) => {
+            e.stopPropagation();
+            removeSearchHistoryItem(queryText);
+        };
+
+        chipsBox.appendChild(chip);
+    });
+
+    if (window.lucide) {
+        try { lucide.createIcons(); } catch(e) {}
+    }
+}
+
+// Remove single query from history
+function removeSearchHistoryItem(query) {
+    let history = getLocalSearchHistory();
+    history = history.filter(h => (typeof h === 'string' ? h : h.query).toLowerCase() !== query.toLowerCase());
+    try {
+        localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(history));
+    } catch (e) {}
+
+    try {
+        const lastRaw = localStorage.getItem(LAST_SEARCH_KEY);
+        if (lastRaw) {
+            const last = JSON.parse(lastRaw);
+            if (last.query && last.query.toLowerCase() === query.toLowerCase()) {
+                localStorage.removeItem(LAST_SEARCH_KEY);
+            }
+        }
+    } catch (e) {}
+
+    // Sync with backend API
+    fetch(`/api/search-history?query=${encodeURIComponent(query)}`, { method: "DELETE" }).catch(() => {});
+
+    renderSearchHistory(history);
+    showToast(`Removed "${query}" from search history`);
+}
+
+// Clear all search history
+function clearSearchHistory() {
+    try {
+        localStorage.removeItem(SEARCH_HISTORY_KEY);
+        localStorage.removeItem(LAST_SEARCH_KEY);
+    } catch (e) {}
+
+    // Sync with backend API
+    fetch("/api/search-history", { method: "DELETE" }).catch(() => {});
+
+    renderSearchHistory([]);
+    showToast("Search history cleared");
+}
+
+// Restore last search upon page reload
+function restoreLastSearch() {
+    try {
+        const raw = localStorage.getItem(LAST_SEARCH_KEY);
+        if (!raw) return false;
+        const last = JSON.parse(raw);
+        if (!last || !last.query) return false;
+
+        const input = document.getElementById("input-url");
+        if (input) {
+            input.value = last.query;
+        }
+
+        renderSearchHistory();
+
+        // If we saved the results, render them immediately so user sees their previous cards!
+        if (last.items && last.items.length > 0) {
+            renderSearchResults(last.items, last.query);
+            // Load the top item into editor
+            scrapeAuctionById(last.items[0].auction_id, true);
+            showToast(`Restored search for "${last.query}" (${last.items.length} items)`);
+            return true;
+        } else {
+            handleScrape();
+            return true;
+        }
+    } catch (e) {
+        return false;
+    }
+}
+
 // Initialize App
 document.addEventListener("DOMContentLoaded", async () => {
     if (window.lucide) {
         try { lucide.createIcons(); } catch(e) {}
     }
+    renderSearchHistory();
     await loadMetadata();
     await loadInventory();
     await loadStats();
 
-    // Auto-load first sample product on fresh start so the user immediately sees photos and clear numbers
-    loadSampleProduct(0);
+    // Check if user had a previous search before reload!
+    const restored = restoreLastSearch();
+    if (!restored) {
+        // Only load first sample product if there is no previous search to restore
+        loadSampleProduct(0);
+    }
 });
 
 // Render Keyword Pills
@@ -153,6 +329,17 @@ async function loadMetadata() {
         const res = await fetch("/api/meta");
         metaData = await res.json();
         
+        // Sync search history from backend if local history is empty
+        if (metaData.search_history && metaData.search_history.length > 0) {
+            let local = getLocalSearchHistory();
+            if (local.length === 0) {
+                try {
+                    localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(metaData.search_history));
+                } catch(e) {}
+            }
+        }
+        renderSearchHistory();
+
         renderKeywordPills();
 
         // Populate Outbound Shipping Methods Dropdown in English
@@ -326,6 +513,7 @@ async function handleScrape(sort = currentSearchSort) {
             }
             currentAuction = data;
             populateScrapedData(data);
+            saveSearchToHistory(queryVal, 1, []);
             showToast("Product details fetched successfully!");
         } else {
             // Keyword live search
@@ -349,6 +537,7 @@ async function handleScrape(sort = currentSearchSort) {
 
             // Render matching items grid
             renderSearchResults(data.items, queryVal);
+            saveSearchToHistory(queryVal, data.items.length, data.items);
             showToast(`Found ${data.items.length} matching auctions for "${queryVal}"!`);
 
             // Auto-load top item into price flow banner & editor
@@ -1433,3 +1622,6 @@ window.loadItemToEditor = loadItemToEditor;
 window.insertKeywordPill = insertKeywordPill;
 window.translateTitleToggle = translateTitleToggle;
 window.translateDescToggle = translateDescToggle;
+window.clearSearchHistory = clearSearchHistory;
+window.removeSearchHistoryItem = removeSearchHistoryItem;
+window.restoreLastSearch = restoreLastSearch;

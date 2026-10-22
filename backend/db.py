@@ -40,6 +40,14 @@ def init_db():
             sold_at TEXT
         )
     """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS search_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            query TEXT UNIQUE,
+            results_count INTEGER DEFAULT 0,
+            updated_at TEXT
+        )
+    """)
     conn.commit()
     conn.close()
 
@@ -248,3 +256,44 @@ def get_stats() -> Dict[str, Any]:
         "inventory_investment": inventory_investment,
         "avg_margin": avg_margin
     }
+
+def save_search_history(query: str, results_count: int = 0) -> None:
+    if not query or not query.strip():
+        return
+    q = query.strip()
+    conn = get_connection()
+    cursor = conn.cursor()
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute("""
+        INSERT INTO search_history (query, results_count, updated_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(query) DO UPDATE SET
+            results_count = excluded.results_count,
+            updated_at = excluded.updated_at
+    """, (q, results_count, now_str))
+    conn.commit()
+    conn.close()
+
+def get_search_history(limit: int = 15) -> List[Dict[str, Any]]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT query, results_count, updated_at
+        FROM search_history
+        ORDER BY updated_at DESC
+        LIMIT ?
+    """, (limit,))
+    rows = cursor.fetchall()
+    history = [{"query": row["query"], "results_count": row["results_count"], "updated_at": row["updated_at"]} for row in rows]
+    conn.close()
+    return history
+
+def delete_search_history(query: Optional[str] = None) -> None:
+    conn = get_connection()
+    cursor = conn.cursor()
+    if query:
+        cursor.execute("DELETE FROM search_history WHERE query = ?", (query.strip(),))
+    else:
+        cursor.execute("DELETE FROM search_history")
+    conn.commit()
+    conn.close()

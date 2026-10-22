@@ -113,6 +113,23 @@
                     </button>
                 </div>
 
+                <!-- Search History Row (Persists across page reloads) -->
+                <div id="search-history-container" class="hidden flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 text-xs">
+                    <div class="flex flex-wrap items-center gap-1.5 flex-1">
+                        <span class="font-bold text-slate-500 flex items-center space-x-1 mr-1">
+                            <i data-lucide="history" class="w-3.5 h-3.5 text-blue-500"></i>
+                            <span>Recent Searches:</span>
+                        </span>
+                        <div id="search-history-chips" class="flex flex-wrap items-center gap-1.5">
+                            <!-- Dynamic recent search chips inserted here -->
+                        </div>
+                    </div>
+                    <button onclick="clearSearchHistory()" class="text-[11px] text-slate-400 hover:text-rose-600 font-medium flex items-center space-x-1 px-2 py-0.5 rounded hover:bg-rose-50 transition" title="Clear all search history">
+                        <i data-lucide="trash-2" class="w-3 h-3"></i>
+                        <span>Clear History</span>
+                    </button>
+                </div>
+
                 <!-- Scraping loading spinner -->
                 <div id="scrape-loading" class="hidden pt-3 border-t border-slate-100 flex items-center justify-center space-x-2 text-slate-600 text-sm">
                     <div class="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>

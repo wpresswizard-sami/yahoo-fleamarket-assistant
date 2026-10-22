@@ -27,7 +27,10 @@ from backend.db import (
     get_item,
     update_item,
     delete_item,
-    get_stats
+    get_stats,
+    save_search_history,
+    get_search_history,
+    delete_search_history
 )
 
 app = FastAPI(title="Yahoo! Auction to Flea Market Reseller Assistant")
@@ -132,6 +135,10 @@ def api_search(req: SearchRequest):
     if not query:
         raise HTTPException(status_code=400, detail="Search query is required")
     items = search_yahoo_auctions(query, limit=req.limit or 12, sort=req.sort or "default")
+    try:
+        save_search_history(query, len(items))
+    except Exception as e:
+        print(f"Error saving search history: {e}")
     return {
         "query": query,
         "count": len(items),
@@ -223,8 +230,18 @@ def api_meta():
         "shipping_methods": SHIPPING_METHODS,
         "platforms": PLATFORM_FEES,
         "templates": get_template_list(),
-        "keyword_pills": KEYWORD_PILLS
+        "keyword_pills": KEYWORD_PILLS,
+        "search_history": get_search_history(limit=12)
     }
+
+@app.get("/api/search-history")
+def api_get_search_history():
+    return get_search_history(limit=15)
+
+@app.delete("/api/search-history")
+def api_delete_search_history(query: Optional[str] = None):
+    delete_search_history(query)
+    return {"success": True}
 
 @app.get("/api/items")
 def api_get_items(status: Optional[str] = "all", search: Optional[str] = None):
