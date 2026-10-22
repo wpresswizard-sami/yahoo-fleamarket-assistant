@@ -1186,18 +1186,27 @@ async function scrapeAuctionById(auctionId, isSilent = false) {
 function getCleanFleaMarketQuery(title) {
     if (!title) return "";
     let clean = title;
-    // Remove brackets like 【極美品】, [新品], etc.
-    clean = clean.replace(/【[^】]*】/g, ' ').replace(/\[[^\]]*\]/g, ' ');
-    // Remove auction start price words (e.g. 1円〜, 100円スタート)
-    clean = clean.replace(/^[0-9]+円〜?/g, ' ').replace(/[0-9]+円スタート/g, ' ');
+    // Remove decorative brackets and symbols like 【極美品】, 『』, 「」, [新品], ☆, ★, etc.
+    clean = clean.replace(/[☆★【】『』「」◆◇■□▲△▼▽◎○※・！!？?♪～~\[\]\(\)（）\/\+\*\:：_、,]/g, ' ');
+    // Remove auction start price words (e.g. 1円開始, 1円〜, 100円スタート)
+    clean = clean.replace(/[0-9]+円開始|[0-9]+円スタート|[0-9]+円〜?/g, ' ');
     // Remove subjective condition adjectives that fail strict flea searches
-    clean = clean.replace(/(美品|極美品|超美品|新品|未使用|中古|ジャンク|完品|動作品|動作確認済|送料無料|即決|正規品|未開封)/g, ' ');
-    // Remove symbols and punctuation
-    clean = clean.replace(/[\(\)（）\/\+\*\:：!！~〜・_]/g, ' ');
-    // Extract top 3-4 keywords (Brand + Model)
-    const tokens = clean.trim().split(/\s+/).filter(w => w.length > 0 && !/^(の|を|に|で|と|は)$/.test(w));
+    clean = clean.replace(/(美品|極美品|超美品|新品|未使用|中古|ジャンク|完品|動作品|動作確認済|送料無料|即決|正規品|未開封|仕様不明|欠品)/g, ' ');
+    // Extract top 3-4 keywords (Brand + Model), skipping generic filler words
+    const tokens = clean.trim().split(/\s+/).filter(w => w.length > 0 && !/^(の|を|に|で|と|は|ノートPC|パソコン)$/.test(w));
     if (tokens.length === 0) return title.trim();
-    return tokens.slice(0, 4).join(" ");
+    
+    const res = [];
+    for (const w of tokens) {
+        if (reMatchSpec(w)) continue;
+        res.push(w);
+        if (res.length >= 4) break;
+    }
+    return res.length > 0 ? res.join(" ") : tokens.slice(0, 3).join(" ");
+}
+
+function reMatchSpec(word) {
+    return /^(Core|メモリ|メモリ.*|SSD.*|HDD.*|Windows.*|Win.*|15\.6.*|13\.3.*|14.*|Pro|Home|64bit)$/i.test(word);
 }
 
 // Update Direct Links to Yahoo Auction Ad and Flea Market Competitor Ads

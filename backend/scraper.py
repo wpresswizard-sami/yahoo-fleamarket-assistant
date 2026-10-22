@@ -383,12 +383,22 @@ def search_yahoo_auctions(query: str, limit: int = 12, sort: str = "default") ->
             is_fixed = bool(it.get("isFixedPrice"))
             is_ending_soon = bool(left_sec is not None and 0 < left_sec < 7200)
 
-            # Projected selling price (standard +35% target)
-            target_sell = round((price + 500) * 1.35)
+            # Projected selling price (Hardware spec-aware estimation)
+            try:
+                from backend.market_radar import estimate_real_flea_price
+                market_est = estimate_real_flea_price(it.get("title", ""), price)
+                if market_est.get("is_custom_spec"):
+                    target_sell = market_est["sweet_spot"]
+                else:
+                    target_sell = round((price + 500) * 1.35)
+            except Exception:
+                target_sell = round((price + 500) * 1.35)
+
             if target_sell < 1000 and price > 0:
                 target_sell = price + 500
             fee = round(target_sell * 0.05)
-            ship = 210
+            t_low = (it.get("title", "") or "").lower()
+            ship = 750 if any(k in t_low for k in ['laptop', 'ノートpc', 'ノートパソコン', 'パソコン', 'pc', '15.6', '13.3', '14.0']) else 210
             net_profit = target_sell - price - fee - ship
 
             results.append({
