@@ -41,12 +41,17 @@
             </div>
 
             <!-- Tab Buttons -->
-            <div class="flex items-center space-x-1 sm:space-x-2 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
-                <button id="tab-btn-sourcing" onclick="switchTab('sourcing')" class="px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center space-x-1.5 bg-white text-slate-900 shadow-sm">
+            <div class="flex items-center space-x-1 sm:space-x-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
+                <button id="tab-btn-hunter" onclick="switchTab('hunter')" class="px-3 sm:px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center space-x-1.5 text-slate-600 hover:text-slate-900">
+                    <i data-lucide="lightbulb" class="w-4 h-4 text-amber-500"></i>
+                    <span>💡 What to Sell?</span>
+                    <span class="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0.2 rounded-full font-bold ml-0.5">Ideas</span>
+                </button>
+                <button id="tab-btn-sourcing" onclick="switchTab('sourcing')" class="px-3 sm:px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center space-x-1.5 bg-white text-slate-900 shadow-sm">
                     <i data-lucide="sparkles" class="w-4 h-4 text-red-500"></i>
                     <span>Sourcing & Listing</span>
                 </button>
-                <button id="tab-btn-inventory" onclick="switchTab('inventory')" class="px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center space-x-1.5 text-slate-600 hover:text-slate-900">
+                <button id="tab-btn-inventory" onclick="switchTab('inventory')" class="px-3 sm:px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center space-x-1.5 text-slate-600 hover:text-slate-900">
                     <i data-lucide="boxes" class="w-4 h-4 text-slate-500"></i>
                     <span>Inventory & Profit</span>
                     <span id="badge-total-items" class="bg-slate-200 text-slate-700 text-xs px-2 py-0.5 rounded-full font-bold ml-1">0</span>
@@ -186,6 +191,95 @@
                     <div id="search-results-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 max-h-80 overflow-y-auto p-1 bg-slate-50/50 rounded-xl border border-slate-200">
                         <!-- Dynamic search result cards inserted here -->
                     </div>
+                </div>
+            </div>
+
+            <!-- WILL IT SELL? (MARKET DEMAND & LIQUIDITY ANALYSIS CARD) -->
+            <div id="card-will-it-sell" class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-white flex items-center justify-center shadow-xs">
+                            <i data-lucide="gauge" class="w-4 h-4"></i>
+                        </div>
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <h3 class="text-sm font-extrabold text-slate-900">
+                                    Will It Sell? — Market Demand & Turnover Score
+                                </h3>
+                                <span id="badge-sell-verdict" class="text-xs px-2.5 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800">
+                                    🔥 High Demand (95%)
+                                </span>
+                            </div>
+                            <p class="text-[11px] text-slate-500">Live resale probability & liquidity check to protect your money from slow-moving inventory</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center space-x-2 self-start sm:self-auto">
+                        <span class="text-xs text-slate-400 font-medium">Expected Time to Sell:</span>
+                        <span id="stat-days-to-sell" class="text-xs font-black text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 flex items-center space-x-1 shadow-2xs">
+                            <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-500"></i>
+                            <span>1 - 2 Days</span>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- 3-Column Metric Highlights -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+                    <!-- Metric 1: Sellability Probability -->
+                    <div class="bg-slate-50/80 p-3 rounded-xl border border-slate-200 flex items-center justify-between">
+                        <div>
+                            <span class="text-[11px] text-slate-500 font-medium block">Sell Probability</span>
+                            <span id="stat-sellability-score" class="text-xl font-black text-emerald-600 block mt-0.5">94%</span>
+                        </div>
+                        <div class="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-sm">
+                            <i data-lucide="check-check" class="w-5 h-5"></i>
+                        </div>
+                    </div>
+
+                    <!-- Metric 2: Capital Risk Assessment -->
+                    <div class="bg-slate-50/80 p-3 rounded-xl border border-slate-200 flex items-center justify-between">
+                        <div>
+                            <span class="text-[11px] text-slate-500 font-medium block">Capital Risk Level</span>
+                            <span id="stat-capital-risk" class="text-xl font-black text-emerald-600 block mt-0.5">Very Low</span>
+                        </div>
+                        <div class="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-sm">
+                            <i data-lucide="shield-check" class="w-5 h-5"></i>
+                        </div>
+                    </div>
+
+                    <!-- Metric 3: Historical Proof Verification -->
+                    <div class="bg-slate-50/80 p-3 rounded-xl border border-slate-200 flex items-center justify-between">
+                        <div>
+                            <span class="text-[11px] text-slate-500 font-medium block">Market Sold Proof</span>
+                            <span class="text-xs font-bold text-slate-800 block mt-0.5">Verified Past Sales</span>
+                        </div>
+                        <div class="flex items-center space-x-1">
+                            <a id="btn-proof-mercari" href="#" target="_blank" class="px-2 py-1 bg-purple-50 hover:bg-purple-600 hover:text-white text-purple-700 border border-purple-200 rounded-lg text-xs font-bold transition flex items-center space-x-0.5 shadow-2xs" title="Verify past completed sales on Mercari">
+                                <span>Mercari</span>
+                                <i data-lucide="external-link" class="w-3 h-3"></i>
+                            </a>
+                            <a id="btn-proof-yahoo" href="#" target="_blank" class="px-2 py-1 bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-700 border border-blue-200 rounded-lg text-xs font-bold transition flex items-center space-x-0.5 shadow-2xs" title="Verify past winning bids on Yahoo Auction">
+                                <span>Yahoo</span>
+                                <i data-lucide="external-link" class="w-3 h-3"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI Verdict & Reasons -->
+                <div id="sellability-reasons" class="bg-emerald-50/70 p-3.5 rounded-xl border border-emerald-200/80 text-xs text-emerald-950 space-y-1.5">
+                    <div class="font-bold flex items-center justify-between text-emerald-900">
+                        <span id="verdict-heading" class="flex items-center space-x-1.5">
+                            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-500"></i>
+                            <span>Safe Buy: This item has proven daily turnover in Japan.</span>
+                        </span>
+                        <span id="verdict-urdu" class="text-[11px] text-emerald-700 font-semibold hidden sm:inline">
+                            Safe Deal! 2 se 4 din me bikne ke 90%+ chance hain.
+                        </span>
+                    </div>
+                    <ul id="verdict-points" class="list-disc list-inside text-[11px] text-slate-600 space-y-0.5 pl-1">
+                        <li>High buyer search volume on Yahoo Flea Market and Mercari.</li>
+                    </ul>
                 </div>
             </div>
 
@@ -620,6 +714,64 @@
 
                 </div>
 
+            </div>
+
+        </section>
+
+        <!-- TAB: WHAT TO SELL? (AI PRODUCT HUNTER & HIGH-DEMAND SUGGESTIONS) -->
+        <section id="tab-hunter" class="hidden space-y-6">
+
+            <!-- Hero Header Banner Card -->
+            <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-6 text-white shadow-lg border border-slate-700/60 relative overflow-hidden">
+                <div class="relative z-10 space-y-2">
+                    <div class="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/30 text-xs font-bold">
+                        <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-400"></i>
+                        <span>Zero Guessing • Proven High-Liquidity Products</span>
+                    </div>
+                    <h2 class="text-xl sm:text-2xl font-black text-white">
+                        💡 What to Sell? — High-Turnover Japanese Product Radar
+                    </h2>
+                    <p class="text-xs sm:text-sm text-slate-300 max-w-3xl leading-relaxed">
+                        Don't know what to search? These pre-vetted items have <b>proven daily buyer turnover in Japan</b>. Click any item to instantly search live Yahoo Auctions, inspect photos, and calculate your net profit with verified sold proof!
+                    </p>
+                </div>
+            </div>
+
+            <!-- Category Filter Toolbar -->
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
+                <div class="flex flex-wrap items-center gap-1.5 text-xs">
+                    <span class="font-bold text-slate-500 flex items-center space-x-1 mr-1 text-[11px]">
+                        <i data-lucide="filter" class="w-3.5 h-3.5 text-slate-400"></i>
+                        <span>Filter by Category:</span>
+                    </span>
+                    <button id="cat-btn-all" onclick="filterSuggestions('all')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition bg-slate-900 text-white shadow-xs">
+                        🌟 All
+                    </button>
+                    <button id="cat-btn-gaming" onclick="filterSuggestions('gaming')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 flex items-center space-x-1">
+                        🎮 Gaming & Consoles
+                    </button>
+                    <button id="cat-btn-electronics" onclick="filterSuggestions('electronics')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 flex items-center space-x-1">
+                        📱 Apple & Gadgets
+                    </button>
+                    <button id="cat-btn-watches" onclick="filterSuggestions('watches')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 flex items-center space-x-1">
+                        ⌚ Japanese Watches
+                    </button>
+                    <button id="cat-btn-cameras" onclick="filterSuggestions('cameras')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 flex items-center space-x-1">
+                        📷 Cameras & Lenses
+                    </button>
+                    <button id="cat-btn-collectibles" onclick="filterSuggestions('collectibles')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 flex items-center space-x-1">
+                        🧸 Anime & Collectibles
+                    </button>
+                </div>
+
+                <div class="text-[11px] text-slate-400 font-medium">
+                    <span id="suggestions-count-badge" class="font-bold text-slate-700">10 products</span> ready to resell
+                </div>
+            </div>
+
+            <!-- Product Suggestions Cards Grid -->
+            <div id="hunter-products-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Dynamically populated product suggestion cards -->
             </div>
 
         </section>

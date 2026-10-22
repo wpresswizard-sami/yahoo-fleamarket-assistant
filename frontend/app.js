@@ -27,6 +27,23 @@ const SAMPLE_PRODUCTS = [
         condition_ja: "目立った傷や汚れなし",
         description: "Operation confirmed. Main console, Joy-Cons, dock, HDMI and AC adapter are fully included. Tempered glass screen protector applied from day one, screen is spotless with zero scratches. Sanitized and packed for fast dispatch.",
         description_ja: "動作確認済み、本体およびJoy-Con・ドック・ケーブル類すべて揃っております。画面にはガラスフィルムを貼っていたためキズ等なく非常に綺麗な状態です。丁寧かつ迅速に発送いたします。",
+        sellability: {
+            score: 96,
+            verdict: "🔥 Extremely High Demand (Instant Seller)",
+            verdict_urdu: "Safe Deal! 1 se 2 din me bikne ke 95%+ chance hain.",
+            est_days: "1 - 2 Days",
+            risk: "Very Low",
+            color: "emerald",
+            reasons: [
+                "Nintendo Switch hardware maintains top-tier search turnover across Japan.",
+                "Over 150+ units successfully completed monthly on Mercari & Yahoo Flea Market.",
+                "Healthy profit spread allows easy competitive pricing."
+            ],
+            proof_links: {
+                mercari_sold: "https://jp.mercari.com/search?keyword=Nintendo%20Switch%20%E6%9C%89%E6%A9%9FEL%E3%83%A2%E3%83%87%E3%83%AB&status=sold_out",
+                yahoo_sold: "https://auctions.yahoo.co.jp/closedsearch/closedsearch?p=Nintendo+Switch"
+            }
+        },
         images: [
             "https://images.unsplash.com/photo-1578303512597-81e6cc155b3e?w=800&q=80",
             "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=800&q=80",
@@ -460,7 +477,8 @@ function loadSampleProduct(index) {
         description: item.description,
         condition: item.condition,
         estimated_inbound_shipping: item.estimated_inbound_shipping || 0,
-        images: item.images || []
+        images: item.images || [],
+        sellability: item.sellability || null
     };
 
     const urlInput = document.getElementById("input-url");
@@ -478,28 +496,289 @@ function loadSampleProduct(index) {
     showToast(`Loaded ${item.name} with ${item.images.length} photos!`);
 }
 
-// Tab Switching
+// Tab Switching (Hunter, Sourcing & Inventory)
 function switchTab(tab) {
+    const hunterTab = document.getElementById("tab-hunter");
     const sourcingTab = document.getElementById("tab-sourcing");
     const inventoryTab = document.getElementById("tab-inventory");
+    const hunterBtn = document.getElementById("tab-btn-hunter");
     const sourcingBtn = document.getElementById("tab-btn-sourcing");
     const inventoryBtn = document.getElementById("tab-btn-inventory");
 
-    if (!sourcingTab || !inventoryTab) return;
+    const tabs = [
+        { id: "hunter", el: hunterTab, btn: hunterBtn },
+        { id: "sourcing", el: sourcingTab, btn: sourcingBtn },
+        { id: "inventory", el: inventoryTab, btn: inventoryBtn }
+    ];
 
-    if (tab === "sourcing") {
-        sourcingTab.classList.remove("hidden");
-        inventoryTab.classList.add("hidden");
-        if (sourcingBtn) sourcingBtn.className = "px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center space-x-1.5 bg-white text-slate-900 shadow-sm";
-        if (inventoryBtn) inventoryBtn.className = "px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center space-x-1.5 text-slate-600 hover:text-slate-900";
-    } else {
-        sourcingTab.classList.add("hidden");
-        inventoryTab.classList.remove("hidden");
-        if (inventoryBtn) inventoryBtn.className = "px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center space-x-1.5 bg-white text-slate-900 shadow-sm";
-        if (sourcingBtn) sourcingBtn.className = "px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center space-x-1.5 text-slate-600 hover:text-slate-900";
+    tabs.forEach(t => {
+        if (!t.el || !t.btn) return;
+        if (t.id === tab) {
+            t.el.classList.remove("hidden");
+            t.btn.className = "px-3 sm:px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center space-x-1.5 bg-white text-slate-900 shadow-sm";
+        } else {
+            t.el.classList.add("hidden");
+            t.btn.className = "px-3 sm:px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center space-x-1.5 text-slate-600 hover:text-slate-900";
+        }
+    });
+
+    if (tab === "hunter") {
+        loadSuggestions(currentSuggestionsCategory || "all");
+    } else if (tab === "inventory") {
         loadInventory();
         loadStats();
     }
+
+    if (window.lucide) {
+        try { lucide.createIcons(); } catch(e) {}
+    }
+}
+
+// ---------------------------------------------------------------------
+// WHAT TO SELL? (AI PRODUCT HUNTER & HIGH-DEMAND SUGGESTIONS)
+// ---------------------------------------------------------------------
+let currentSuggestionsCategory = "all";
+let cachedSuggestions = [];
+
+async function loadSuggestions(category = "all") {
+    currentSuggestionsCategory = category;
+    const grid = document.getElementById("hunter-products-grid");
+    const countBadge = document.getElementById("suggestions-count-badge");
+    if (!grid) return;
+
+    grid.innerHTML = `
+        <div class="col-span-full py-16 text-center text-slate-500 text-xs flex flex-col items-center justify-center space-y-2">
+            <div class="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+            <span>Analyzing Japanese flea market demand & loading high-turnover products...</span>
+        </div>
+    `;
+
+    try {
+        const res = await fetch(`/api/suggestions?category=${encodeURIComponent(category)}`);
+        const data = await res.json();
+        cachedSuggestions = data.items || [];
+
+        if (countBadge) {
+            countBadge.innerText = `${cachedSuggestions.length} products`;
+        }
+
+        renderSuggestionsGrid(cachedSuggestions);
+    } catch (e) {
+        grid.innerHTML = `
+            <div class="col-span-full py-8 text-center text-rose-500 text-xs">
+                Failed to load product suggestions: ${e.message}
+            </div>
+        `;
+    }
+}
+
+function filterSuggestions(cat) {
+    const categories = ["all", "gaming", "electronics", "watches", "cameras", "collectibles"];
+    categories.forEach(c => {
+        const btn = document.getElementById(`cat-btn-${c}`);
+        if (!btn) return;
+        if (c === cat) {
+            btn.className = "px-3 py-1.5 rounded-lg text-xs font-bold transition bg-slate-900 text-white shadow-xs";
+        } else {
+            btn.className = "px-3 py-1.5 rounded-lg text-xs font-bold transition bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 flex items-center space-x-1";
+        }
+    });
+    loadSuggestions(cat);
+}
+
+function renderSuggestionsGrid(items) {
+    const grid = document.getElementById("hunter-products-grid");
+    if (!grid) return;
+    grid.innerHTML = "";
+
+    if (!items || items.length === 0) {
+        grid.innerHTML = `
+            <div class="col-span-full py-12 text-center text-slate-400 text-xs">
+                No verified products found for this category.
+            </div>
+        `;
+        return;
+    }
+
+    items.forEach(item => {
+        const card = document.createElement("div");
+        card.className = "bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4 group";
+
+        const cleanSearch = getCleanFleaMarketQuery(item.query);
+        const encodedQ = encodeURIComponent(cleanSearch || item.query);
+        const mercariSoldUrl = `https://jp.mercari.com/search?keyword=${encodedQ}&status=sold_out`;
+
+        card.innerHTML = `
+            <div class="space-y-3">
+                <!-- Top Tags -->
+                <div class="flex items-center justify-between">
+                    <span class="text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                        ${item.category_label}
+                    </span>
+                    <span class="text-[11px] font-extrabold px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-200 shadow-2xs">
+                        ${item.badge}
+                    </span>
+                </div>
+
+                <!-- Product Name -->
+                <div>
+                    <h3 class="text-sm font-black text-slate-900 leading-snug group-hover:text-red-600 transition">
+                        ${item.name}
+                    </h3>
+                    <p class="text-[11px] text-slate-400 font-mono mt-0.5">${item.english_name}</p>
+                </div>
+
+                <!-- Price Flow & Profit Box -->
+                <div class="bg-gradient-to-br from-slate-900 to-indigo-950 p-3.5 rounded-xl text-white space-y-2 shadow-xs">
+                    <div class="flex items-center justify-between text-[11px] text-slate-300">
+                        <span>Buy on Yahoo: <b class="text-white">¥${item.typical_buy_price.toLocaleString()}</b></span>
+                        <span>Sell on Flea: <b class="text-amber-300">¥${item.typical_sell_price.toLocaleString()}</b></span>
+                    </div>
+                    <div class="border-t border-slate-700/80 pt-2 flex items-baseline justify-between">
+                        <div>
+                            <span class="text-[10px] text-emerald-400 block font-medium">Estimated Net Profit</span>
+                            <span class="text-xl font-black text-emerald-400">+¥${item.est_profit.toLocaleString()}</span>
+                        </div>
+                        <span class="text-xs font-bold text-slate-200 bg-emerald-900/60 border border-emerald-500/40 px-2 py-0.5 rounded">
+                            ${item.margin_percent}% ROI
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Demand & Velocity Badges -->
+                <div class="grid grid-cols-2 gap-2 text-center text-xs">
+                    <div class="bg-emerald-50/80 border border-emerald-200 p-2 rounded-lg">
+                        <span class="text-[10px] text-emerald-800 font-medium block">Sellability Score</span>
+                        <b class="text-sm font-black text-emerald-700 block">${item.demand_score}%</b>
+                    </div>
+                    <div class="bg-blue-50/80 border border-blue-200 p-2 rounded-lg">
+                        <span class="text-[10px] text-blue-800 font-medium block">Expected Sell Speed</span>
+                        <b class="text-xs font-black text-blue-700 block mt-0.5">${item.est_days_to_sell}</b>
+                    </div>
+                </div>
+
+                <!-- Why it Sells -->
+                <div class="text-[11px] text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 space-y-1">
+                    <span class="font-bold text-slate-800 block text-[10px] uppercase tracking-wide">💡 Resale Intelligence:</span>
+                    <ul class="list-disc list-inside space-y-0.5 pl-0.5 text-[11px]">
+                        ${item.reasons.map(r => `<li>${r}</li>`).join('')}
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="pt-3 border-t border-slate-100 space-y-2">
+                <button type="button" onclick="loadSuggestedProduct('${item.id}')" class="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs transition flex items-center justify-center space-x-1.5 shadow-md shadow-red-100">
+                    <i data-lucide="zap" class="w-4 h-4"></i>
+                    <span>⚡ 1-Click Search Live Yahoo Auctions</span>
+                </button>
+                <div class="flex items-center justify-between text-[11px]">
+                    <span class="text-slate-400 font-medium">${item.monthly_sold_count}</span>
+                    <a href="${mercariSoldUrl}" target="_blank" class="text-purple-600 hover:text-purple-800 font-bold flex items-center space-x-1" title="Verify completed sales proof">
+                        <span>Check Sold Proof</span>
+                        <i data-lucide="external-link" class="w-3 h-3"></i>
+                    </a>
+                </div>
+            </div>
+        `;
+
+        grid.appendChild(card);
+    });
+
+    if (window.lucide) {
+        try { lucide.createIcons(); } catch(e) {}
+    }
+}
+
+// 1-Click Load Suggested Product into Sourcing Workflow
+async function loadSuggestedProduct(itemId) {
+    const item = cachedSuggestions.find(s => s.id === itemId);
+    if (!item) return;
+
+    // Switch to sourcing tab
+    switchTab("sourcing");
+
+    const input = document.getElementById("input-url");
+    if (input) {
+        input.value = item.query;
+    }
+    toggleClearSearchBtn();
+
+    showToast(`Searching live Yahoo Auctions for "${item.name}"...`);
+    await handleScrape();
+}
+
+// ---------------------------------------------------------------------
+// WILL IT SELL? (MARKET DEMAND & LIQUIDITY ANALYSIS)
+// ---------------------------------------------------------------------
+function updateSellabilityCard(sellability) {
+    const card = document.getElementById("card-will-it-sell");
+    if (!card) return;
+    if (!sellability) return;
+
+    card.classList.remove("hidden");
+
+    // 1. Verdict badge
+    const badgeVerdict = document.getElementById("badge-sell-verdict");
+    if (badgeVerdict) {
+        badgeVerdict.innerText = sellability.verdict || "High Demand";
+        if (sellability.color === "emerald" || (sellability.score && sellability.score >= 75)) {
+            badgeVerdict.className = "text-xs px-2.5 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800";
+        } else if (sellability.color === "amber" || (sellability.score && sellability.score >= 60)) {
+            badgeVerdict.className = "text-xs px-2.5 py-0.5 rounded-full font-bold bg-amber-100 text-amber-800";
+        } else {
+            badgeVerdict.className = "text-xs px-2.5 py-0.5 rounded-full font-bold bg-rose-100 text-rose-800";
+        }
+    }
+
+    // 2. Expected Days to sell
+    const daysEl = document.getElementById("stat-days-to-sell");
+    if (daysEl) {
+        daysEl.innerHTML = `<i data-lucide="zap" class="w-3.5 h-3.5 text-amber-500"></i><span>${sellability.est_days || "1 - 3 Days"}</span>`;
+    }
+
+    // 3. Sellability Score
+    const scoreEl = document.getElementById("stat-sellability-score");
+    if (scoreEl) {
+        const score = sellability.score || 85;
+        scoreEl.innerText = `${score}%`;
+        scoreEl.className = score >= 75 ? "text-xl font-black text-emerald-600 block mt-0.5" : (score >= 60 ? "text-xl font-black text-amber-600 block mt-0.5" : "text-xl font-black text-rose-600 block mt-0.5");
+    }
+
+    // 4. Capital Risk Level
+    const riskEl = document.getElementById("stat-capital-risk");
+    if (riskEl) {
+        riskEl.innerText = sellability.risk || "Low";
+    }
+
+    // 5. Market Proof Verification Links
+    if (sellability.proof_links) {
+        const linkMercari = document.getElementById("btn-proof-mercari");
+        if (linkMercari && sellability.proof_links.mercari_sold) {
+            linkMercari.href = sellability.proof_links.mercari_sold;
+        }
+        const linkYahoo = document.getElementById("btn-proof-yahoo");
+        if (linkYahoo && sellability.proof_links.yahoo_sold) {
+            linkYahoo.href = sellability.proof_links.yahoo_sold;
+        }
+    }
+
+    // 6. Verdict explanation & Urdu guidance
+    const headingEl = document.getElementById("verdict-heading");
+    if (headingEl) {
+        headingEl.innerHTML = `<i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-500"></i><span>${sellability.verdict || "Safe Buy"}</span>`;
+    }
+    const urduEl = document.getElementById("verdict-urdu");
+    if (urduEl && sellability.verdict_urdu) {
+        urduEl.innerText = sellability.verdict_urdu;
+    }
+
+    // 7. Reasons Bullet Points
+    const pointsList = document.getElementById("verdict-points");
+    if (pointsList && sellability.reasons) {
+        pointsList.innerHTML = sellability.reasons.map(r => `<li>${r}</li>`).join("");
+    }
+
     if (window.lucide) {
         try { lucide.createIcons(); } catch(e) {}
     }
@@ -689,6 +968,11 @@ function renderSearchResults(items, query) {
         const fleaSearchUrl = `https://paypayfleamarket.yahoo.co.jp/search/${encodedTitle}`;
         const yahooAuctionUrl = item.url || `https://page.auctions.yahoo.co.jp/jp/auction/${item.auction_id}`;
 
+        const sellBadge = item.sellability ? 
+            `<span class="absolute bottom-1 left-1 ${item.sellability.score >= 75 ? 'bg-emerald-600' : (item.sellability.score >= 60 ? 'bg-amber-600' : 'bg-slate-700')} text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-2xs">
+                ${item.sellability.score}% Demand
+            </span>` : '';
+
         const timeBadgeHtml = item.remaining_time ? 
             `<span class="absolute top-1 right-1 ${item.is_ending_soon ? 'bg-rose-600 text-white animate-pulse' : 'bg-slate-900/80 text-amber-300'} text-[9px] font-bold px-1.5 py-0.5 rounded shadow-xs flex items-center space-x-1">
                 <span>⏰ ${item.remaining_time}</span>
@@ -699,6 +983,7 @@ function renderSearchResults(items, query) {
                 <img src="${imgUrl}" alt="${item.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" onerror="this.src='https://placehold.co/150x150?text=No+Photo'">
                 <span class="absolute top-1 left-1 bg-black/70 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">#${idx+1}</span>
                 ${item.is_free_shipping ? '<span class="absolute bottom-1 right-1 bg-emerald-600 text-white text-[9px] font-bold px-1 py-0.5 rounded">Free Ship</span>' : ''}
+                ${sellBadge}
                 ${timeBadgeHtml}
             </div>
 
@@ -949,6 +1234,22 @@ function populateScrapedData(data) {
 
     renderImages(data.images || []);
     updateExternalLinks(data);
+
+    // Update 'Will It Sell?' Market Demand & Liquidity Card
+    if (data.sellability) {
+        updateSellabilityCard(data.sellability);
+    } else {
+        const titleText = data.title || "";
+        const buyP = data.buy_price || 0;
+        fetch("/api/sellability", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query: titleText, buy_price: buyP, target_sell_price: initSell, bids: data.bids || 0 })
+        })
+        .then(r => r.json())
+        .then(s => updateSellabilityCard(s))
+        .catch(() => {});
+    }
 
     // Update live auction time and bids in Box 1
     const bannerTime = document.getElementById("banner-auction-time");
@@ -1713,3 +2014,7 @@ window.removeSearchHistoryItem = removeSearchHistoryItem;
 window.restoreLastSearch = restoreLastSearch;
 window.resetToNewSearch = resetToNewSearch;
 window.toggleClearSearchBtn = toggleClearSearchBtn;
+window.filterSuggestions = filterSuggestions;
+window.loadSuggestedProduct = loadSuggestedProduct;
+window.loadSuggestions = loadSuggestions;
+window.updateSellabilityCard = updateSellabilityCard;

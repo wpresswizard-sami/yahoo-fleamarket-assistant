@@ -20,6 +20,11 @@ from backend.templates_engine import (
     get_template_list,
     KEYWORD_PILLS
 )
+from backend.market_radar import (
+    get_product_suggestions,
+    calculate_sellability,
+    TRENDING_PRODUCTS_CATALOG
+)
 from backend.db import (
     init_db,
     add_item,
@@ -128,6 +133,13 @@ class TranslateRequest(BaseModel):
     target_lang: Optional[str] = "en"
     source_lang: Optional[str] = "auto"
 
+class SellabilityRequest(BaseModel):
+    query: str
+    buy_price: Optional[int] = 0
+    target_sell_price: Optional[int] = 0
+    bids: Optional[int] = 0
+    is_ending_soon: Optional[bool] = False
+
 # API Endpoints
 @app.post("/api/search")
 def api_search(req: SearchRequest):
@@ -135,6 +147,17 @@ def api_search(req: SearchRequest):
     if not query:
         raise HTTPException(status_code=400, detail="Search query is required")
     items = search_yahoo_auctions(query, limit=req.limit or 12, sort=req.sort or "default")
+    
+    # Enrich with real-time sellability metrics
+    for item in items:
+        item["sellability"] = calculate_sellability(
+            query_or_title=item.get("title", ""),
+            buy_price=item.get("buy_price", 0),
+            target_sell_price=item.get("target_sell_price", 0),
+            bids_count=item.get("bids", 0),
+            is_ending_soon=item.get("is_ending_soon", False)
+        )
+
     try:
         save_search_history(query, len(items))
     except Exception as e:
@@ -173,6 +196,16 @@ def api_scrape(req: ScrapeRequest):
         platform="yahoo_flea"
     )
     result["suggestions"] = suggestions
+
+    # Compute 'Will It Sell?' sellability score and turnover verdict
+    target_sell = suggestions.get("suggested_target_3000", {}).get("sell_price", 0)
+    result["sellability"] = calculate_sellability(
+        query_or_title=result.get("title", ""),
+        buy_price=buy_price,
+        target_sell_price=target_sell,
+        bids_count=result.get("bids", 0),
+        is_ending_soon=result.get("is_ending_soon", False)
+    )
     return result
 
 @app.post("/api/translate")
@@ -224,6 +257,24 @@ def api_format_desc(req: FormatDescRequest):
     )
     return {"formatted": formatted}
 
+@app.get("/api/suggestions")
+def api_get_suggestions(category: Optional[str] = "all"):
+    return {
+        "category": category,
+        "items": get_product_suggestions(category)
+    }
+
+@app.post("/api/sellability")
+def api_check_sellability(req: SellabilityRequest):
+    result = calculate_sellability(
+        query_or_title=req.query,
+        buy_price=req.buy_price or 0,
+        target_sell_price=req.target_sell_price or 0,
+        bids_count=req.bids or 0,
+        is_ending_soon=req.is_ending_soon or False
+    )
+    return result
+
 @app.get("/api/meta")
 def api_meta():
     return {
@@ -231,7 +282,8 @@ def api_meta():
         "platforms": PLATFORM_FEES,
         "templates": get_template_list(),
         "keyword_pills": KEYWORD_PILLS,
-        "search_history": get_search_history(limit=12)
+        "search_history": get_search_history(limit=12),
+        "suggestions_count": len(TRENDING_PRODUCTS_CATALOG)
     }
 
 @app.get("/api/search-history")
