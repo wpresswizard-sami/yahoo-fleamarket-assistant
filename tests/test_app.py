@@ -130,5 +130,12 @@ class TestAppEndpoints(unittest.TestCase):
         self.assertIn("units_sold_60d", first)
         self.assertIn("turnaround_speed", first)
 
+    def test_08_flea_sold_api(self):
+        res = client.get("/api/flea-sold?query=HP+ProBook+450+G9")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertIn("items", data)
+        self.assertIn("count", data)
+
 if __name__ == "__main__":
     unittest.main()

@@ -1209,6 +1209,87 @@ function reMatchSpec(word) {
     return /^(Core|メモリ|メモリ.*|SSD.*|HDD.*|Windows.*|Win.*|15\.6.*|13\.3.*|14.*|Pro|Home|64bit)$/i.test(word);
 }
 
+// 1-Click apply exact price from actual Yahoo Flea Market completed sale
+function applyExactFleaPrice(exactPrice) {
+    const input = document.getElementById("calc-sell-price");
+    if (input) {
+        input.value = exactPrice;
+        recalculateProfit();
+        showToast(`Exact Flea Market Sold Price applied: ¥${Number(exactPrice).toLocaleString()}`);
+    }
+}
+
+// Load real completed sold listings directly from Yahoo Flea Market API
+async function loadLiveFleaSold(title, preloadedItems = null) {
+    const grid = document.getElementById("live-flea-sold-grid");
+    if (!grid) return;
+
+    if (preloadedItems && preloadedItems.length > 0) {
+        renderFleaSoldCards(grid, preloadedItems);
+        return;
+    }
+
+    grid.innerHTML = `<div class="col-span-full py-4 text-center text-xs text-slate-400 flex items-center justify-center space-x-1.5">
+        <span class="w-3.5 h-3.5 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></span>
+        <span>Fetching live actual completed sales from Yahoo! Flea Market...</span>
+    </div>`;
+
+    try {
+        const cleanTitle = getCleanFleaMarketQuery(title);
+        const res = await fetch(`/api/flea-sold?query=${encodeURIComponent(cleanTitle || title)}`);
+        const data = await res.json();
+        const items = data.items || [];
+        renderFleaSoldCards(grid, items);
+    } catch (e) {
+        console.error("Error loading live flea sold:", e);
+        grid.innerHTML = `<div class="col-span-full py-2 text-center text-xs text-slate-400">Could not load live sales</div>`;
+    }
+}
+
+function renderFleaSoldCards(grid, items) {
+    if (!items || items.length === 0) {
+        grid.innerHTML = `<div class="col-span-full py-3 text-center text-xs text-slate-500 bg-slate-50 rounded-xl border border-slate-200">
+            No exact matching sold ads found on Yahoo Flea Market. Try broader search.
+        </div>`;
+        return;
+    }
+
+    grid.innerHTML = items.map((it, idx) => `
+        <div class="bg-white p-2.5 rounded-xl border border-slate-200 shadow-xs hover:border-red-400 transition flex flex-col justify-between space-y-2 group">
+            <div class="flex space-x-2.5 items-start">
+                <div class="relative w-16 h-16 rounded-lg overflow-hidden bg-slate-100 flex-shrink-0 border border-slate-200">
+                    <img src="${it.thumbnail || 'https://placehold.co/100x100?text=Sold'}" alt="${it.title}" class="w-full h-full object-cover">
+                    <span class="absolute top-0.5 left-0.5 bg-red-600 text-white text-[8px] font-black px-1 py-0.2 rounded shadow-2xs">SOLD</span>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-baseline space-x-1.5 flex-wrap">
+                        <span class="text-base font-black text-slate-900">${it.price_formatted}</span>
+                        <span class="text-[9px] font-extrabold text-emerald-700 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200">送料無料</span>
+                    </div>
+                    <p class="text-[10px] text-slate-600 line-clamp-2 leading-tight mt-0.5" title="${it.title}">${it.title}</p>
+                </div>
+            </div>
+
+            <div class="pt-1.5 border-t border-slate-100 flex items-center justify-between text-[10px]">
+                <span class="text-slate-500 text-[10px]">Seller Ship: <b>-¥${it.shipping_cost}</b></span>
+                <div class="flex items-center space-x-1">
+                    <a href="${it.url}" target="_blank" class="px-1.5 py-1 text-slate-500 hover:text-blue-600 font-bold" title="Open live sold ad on Yahoo Flea Market">
+                        <i data-lucide="external-link" class="w-3 h-3"></i>
+                    </a>
+                    <button type="button" onclick="applyExactFleaPrice(${it.price})" class="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold rounded-lg transition shadow-2xs flex items-center space-x-1" title="Use this exact sold price in profit calculator">
+                        <i data-lucide="zap" class="w-3 h-3 text-slate-950"></i>
+                        <span>Apply ¥${Number(it.price).toLocaleString()}</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+
+    if (window.lucide) {
+        try { lucide.createIcons(); } catch(e) {}
+    }
+}
+
 // Update Direct Links to Yahoo Auction Ad and Flea Market Competitor Ads
 function updateExternalLinks(data) {
     if (!data) return;
@@ -1321,7 +1402,7 @@ function populateScrapedData(data) {
     const inShipEl = document.getElementById("calc-inbound-shipping");
     if (inShipEl) inShipEl.value = data.estimated_inbound_shipping || 0;
 
-    let initSell = Math.round(((data.buy_price || 0) + (data.estimated_inbound_shipping || 0) + 500) * 1.35);
+    let initSell = data.target_sell_price || Math.round(((data.buy_price || 0) + (data.estimated_inbound_shipping || 0) + 500) * 1.35);
     if (initSell < 1000) initSell = 1200;
     const sellPriceEl = document.getElementById("calc-sell-price");
     if (sellPriceEl) sellPriceEl.value = initSell;
@@ -1344,6 +1425,9 @@ function populateScrapedData(data) {
         .then(s => updateSellabilityCard(s))
         .catch(() => {});
     }
+
+    // Fetch and display Live Verified Completed Sales from Yahoo Flea Market
+    loadLiveFleaSold(data.title, data.live_flea_sold);
 
     // Update live auction time and bids in Box 1
     const bannerTime = document.getElementById("banner-auction-time");

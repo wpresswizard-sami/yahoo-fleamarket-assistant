@@ -424,3 +424,84 @@ def search_yahoo_auctions(query: str, limit: int = 12, sort: str = "default") ->
         print(f"Search error: {e}")
         return []
 
+def fetch_paypay_live_sold(query_or_title: str, limit: int = 6) -> List[Dict[str, Any]]:
+    """
+    Directly scrapes actual completed (SOLD) ads from Yahoo! Flea Market (PayPay Flea Market).
+    Returns real sold prices, exact listing titles, photos, and direct item links.
+    """
+    if not query_or_title:
+        return []
+
+    # Clean auction noise & extract core model keywords
+    clean = re.sub(r'[☆★【】『』「」◆◇■□▲△▼▽◎○※・！!？?♪～~\[\]\(\)（）\/\+\*\:：_、,]', ' ', query_or_title)
+    clean = re.sub(r'[0-9]+円開始|[0-9]+円スタート|[0-9]+円〜?', ' ', clean)
+    clean = re.sub(r'(美品|極美品|超美品|新品|未使用|中古|ジャンク|完品|動作品|動作確認済|送料無料|即決|正規品|未開封|仕様不明|欠品)', ' ', clean)
+    tokens = [w for w in clean.strip().split() if len(w) > 0 and not re.match(r'^(Core|メモリ.*|SSD.*|HDD.*|Windows.*|Win.*|15\.6.*|13\.3.*|14.*|Pro|Home|64bit)$', w, re.I)]
+    
+    # Split fused model numbers like 450G9 -> 450 G9
+    model_tokens = []
+    for w in tokens:
+        m = re.match(r'^([0-9]{3,4})([A-Za-z][0-9]*)$', w)
+        if m:
+            model_tokens.extend([m.group(1), m.group(2)])
+        else:
+            model_tokens.append(w)
+        if len(model_tokens) >= 4:
+            break
+            
+    clean_q = " ".join(model_tokens) if model_tokens else query_or_title[:30]
+    import urllib.parse
+    encoded = urllib.parse.quote(clean_q)
+    url = f"https://paypayfleamarket.yahoo.co.jp/search/{encoded}"
+    
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "ja,en-US;q=0.9,en;q=0.8"
+    }
+    
+    try:
+        resp = requests.get(url, headers=headers, timeout=8)
+        if resp.status_code != 200:
+            return []
+        
+        m = re.search(r'<script id=[\x22\x27]__NEXT_DATA__[\x22\x27][^>]*>(.*?)</script>', resp.text)
+        if not m:
+            return []
+            
+        data = json.loads(m.group(1))
+        items = data.get('props', {}).get('initialState', {}).get('searchState', {}).get('search', {}).get('result', {}).get('items', [])
+        sold = [it for it in items if it.get('itemStatus') == 'SOLD']
+        
+        results = []
+        is_laptop = any(k in clean_q.lower() for k in ['hp', 'dell', 'thinkpad', 'probook', 'vostro', 'laptop', 'ノート', 'dynabook', 'cf-'])
+        shipping_fee = 750 if is_laptop else 210
+        
+        for it in sold[:limit]:
+            iid = it.get('id', '')
+            price = int(it.get('price', 0))
+            title = it.get('title', '')
+            thumb = it.get('thumbnailUrl') or (it.get('images', [{}])[0].get('url') if it.get('images') else '')
+            fee = round(price * 0.05)
+            net_proceeds = price - fee - shipping_fee
+            
+            results.append({
+                "id": iid,
+                "title": title,
+                "price": price,
+                "price_formatted": f"¥{price:,}",
+                "thumbnail": thumb,
+                "url": f"https://paypayfleamarket.yahoo.co.jp/item/{iid}",
+                "is_free_shipping": True,
+                "shipping_label": "送料無料 (Free Shipping)",
+                "shipping_cost": shipping_fee,
+                "platform_fee": fee,
+                "net_proceeds": net_proceeds,
+                "sold_badge": "SOLD"
+            })
+            
+        return results
+    except Exception as e:
+        print(f"Error fetching live flea sold items: {e}")
+        return []
+

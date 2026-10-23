@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 
-from backend.scraper import scrape_yahoo_auction, normalize_auction_url, search_yahoo_auctions
+from backend.scraper import scrape_yahoo_auction, normalize_auction_url, search_yahoo_auctions, fetch_paypay_live_sold
 from backend.calculator import calculate_profit, suggest_prices, SHIPPING_METHODS, PLATFORM_FEES
 from backend.templates_engine import (
     generate_flea_description,
@@ -206,6 +206,13 @@ def api_scrape(req: ScrapeRequest):
         bids_count=result.get("bids", 0),
         is_ending_soon=result.get("is_ending_soon", False)
     )
+
+    # Fetch live completed sold listings directly from PayPay Flea Market
+    try:
+        result["live_flea_sold"] = fetch_paypay_live_sold(result.get("title", ""), limit=6)
+    except Exception:
+        result["live_flea_sold"] = []
+
     return result
 
 @app.post("/api/translate")
@@ -262,6 +269,18 @@ def api_get_suggestions(category: Optional[str] = "all"):
     return {
         "category": category,
         "items": get_product_suggestions(category)
+    }
+
+@app.get("/api/flea-sold")
+def api_get_flea_sold(query: str, limit: Optional[int] = 6):
+    q = query.strip()
+    if not q:
+        return {"query": "", "items": []}
+    items = fetch_paypay_live_sold(q, limit=limit or 6)
+    return {
+        "query": q,
+        "count": len(items),
+        "items": items
     }
 
 @app.post("/api/sellability")
