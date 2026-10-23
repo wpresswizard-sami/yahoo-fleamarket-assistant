@@ -1125,6 +1125,7 @@ function renderSearchResults(items, query) {
                     <span class="text-slate-600">💰 Total Buy Cost:</span>
                     <b class="text-slate-950 font-black">¥${totalBuyCost.toLocaleString()}</b>
                 </div>` : ''}
+                ${item.target_sell_price > 0 ? `
                 <div class="flex justify-between items-center text-slate-500">
                     <span class="flex items-center space-x-1">
                         <span>🏷️ Flea Target:</span>
@@ -1137,7 +1138,7 @@ function renderSearchResults(items, query) {
                         }
                     </div>
                 </div>
-                ${item.is_overpriced || item.estimated_profit < 0 ? `
+                ${item.is_overpriced || (item.estimated_profit !== null && item.estimated_profit < 0) ? `
                 <div class="flex justify-between items-center pt-0.5 border-t border-dashed border-rose-300 bg-rose-50 px-1.5 py-0.5 rounded text-rose-800">
                     <span class="font-bold text-rose-700">⚠️ Overpriced (Loss):</span>
                     <b class="font-black text-rose-600 text-xs">${profitBadge}</b>
@@ -1148,6 +1149,18 @@ function renderSearchResults(items, query) {
                 <div class="flex justify-between items-center pt-0.5 border-t border-dashed border-slate-200">
                     <span class="font-bold text-slate-600">💰 Est Profit:</span>
                     <b class="font-black ${profitColor} text-xs">${profitBadge}</b>
+                </div>`
+                }` : `
+                <div class="flex justify-between items-center text-slate-500">
+                    <span>🏷️ Flea Target:</span>
+                    <span class="text-[10px] font-bold text-slate-400">未確認 (No Flea Data)</span>
+                </div>
+                <div class="flex justify-between items-center pt-0.5 border-t border-dashed border-slate-200 text-slate-500">
+                    <span class="font-bold">💰 Est Profit:</span>
+                    <span class="text-[10px] text-slate-400 font-semibold">-- (Check Live Ads)</span>
+                </div>
+                <div class="text-[9px] text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 font-semibold text-center mt-1">
+                    💡 Click PayPay button to check live competitor ads
                 </div>`
                 }
             </div>
@@ -1272,11 +1285,32 @@ function getCleanFleaMarketQuery(title) {
     clean = clean.replace(noiseRegex, ' ');
     // 5. Remove standalone specs
     clean = clean.replace(/\b[0-9]+(?:GB|TB|MB)\b|\b[0-9]+(?:\.[0-9]+)?インチ\b|第[0-9]+世代/gi, ' ');
-    // 6. Remove generic long category descriptors
+
+    // 6. Normalize redundant platform names:
+    clean = clean.replace(/Play\s*Station\s*5|PlayStation\s*5|プレイステーション\s*5/gi, 'PS5');
+    clean = clean.replace(/Play\s*Station\s*4|PlayStation\s*4|プレイステーション\s*4/gi, 'PS4');
+    clean = clean.replace(/Play\s*Station\s*3|PlayStation\s*3|プレイステーション\s*3/gi, 'PS3');
+    clean = clean.replace(/Play\s*Station|PlayStation|プレイステーション/gi, 'PS');
+    clean = clean.replace(/Nintendo\s*Switch|ニンテンドースイッチ/gi, 'Switch');
+    clean = clean.replace(/\bPS5\s+PS5\b/gi, 'PS5');
+    clean = clean.replace(/\bPS4\s+PS4\b/gi, 'PS4');
+    clean = clean.replace(/\bSwitch\s+Switch\b/gi, 'Switch');
+
+    // 7. Strip generic media/game filler words: ソフト, カセット, ディスク, ゲーム
+    clean = clean.replace(/\b(ソフト|カセット|ディスク|ゲームソフト|ゲーム)\b/g, ' ');
+
+    // 8. Remove generic long category descriptors
     const catRegex = /(ワイヤレスノイズキャンセリングヘッドホン|ノイズキャンセリングヘッドホン|ワイヤレスヘッドホン|ヘッドホン|イヤホン|ブルーレイレコーダー|DVDレコーダー|レコーダー|DJコントローラー|コントローラー|Controller|リモコン|Remote|ノートパソコン|パソコン|Amplifier|Unit|アンプ)/gi;
     clean = clean.replace(catRegex, ' ');
 
-    const rawWords = clean.split(/\s+/).map(w => w.trim()).filter(w => w.length > 1);
+    const rawWords = clean.split(/\s+/).map(w => w.trim()).filter(w => w.length > 0);
+    if (rawWords.length === 0) return title.trim();
+
+    // 9. Strip seller SKU / inventory prefix codes at the start of title (e.g. tu050, k123, m01, a12, 管01, etc.)
+    const skuPattern = /^[a-zA-Z]{1,3}[-_]?[0-9]{2,6}$|^[0-9]{3,6}$/;
+    while (rawWords.length > 0 && (skuPattern.test(rawWords[0]) || /^(?:管|棚|箱|倉庫|No|SKU)[-_0-9A-Za-z]+$/.test(rawWords[0]))) {
+        rawWords.shift();
+    }
     if (rawWords.length === 0) return title.trim();
 
     // Deduplicate bilingual brands
@@ -1303,7 +1337,7 @@ function getCleanFleaMarketQuery(title) {
         if (!skip) words.push(w);
     }
 
-    // Search for hyphenated model code first (BP-500DX2, CUH-7200B, WH-1000XM4, DMR-BRW1020, DDJ-400)
+    // Search for hyphenated model code first (BP-500DX2, CFI-1200B, CUH-7200B, WH-1000XM4, DMR-BRW1020, DDJ-400)
     const hyphenModelRegex = /^[A-Za-z0-9]+[-_][A-Za-z0-9]+$/;
     let modelIdx = -1;
     for (let i = 0; i < words.length; i++) {
@@ -1318,7 +1352,7 @@ function getCleanFleaMarketQuery(title) {
         const otherModelRegex = /^(?:[0-9]{3,4}[A-Za-z]?|[A-Z][0-9]|[A-Z]+[0-9]+)$/;
         for (let i = 0; i < words.length; i++) {
             const up = words[i].toUpperCase();
-            if (up === 'PS4' || up === 'PS5' || up === 'PS3' || up === 'PS2') continue;
+            if (up === 'PS4' || up === 'PS5' || up === 'PS3' || up === 'PS2' || up === 'PS') continue;
             if (otherModelRegex.test(words[i])) {
                 modelIdx = i;
                 break;

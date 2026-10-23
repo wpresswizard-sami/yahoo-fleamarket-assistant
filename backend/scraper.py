@@ -35,9 +35,10 @@ def normalize_auction_url(input_str: str) -> str:
 
 def extract_main_flea_keyword(title: str) -> str:
     """
-    Extracts the high-signal core model, brand, and main product keyword from a bloated
-    Yahoo! Auction title, stripping auction noise, emojis, spam brackets, and filler words
-    so that PayPay Flea Market and Mercari return maximum matching results.
+    Extracts high-signal core model, brand, and main product keyword from a bloated
+    Yahoo! Auction title, stripping auction noise, emojis, spam brackets, filler words,
+    AND internal seller SKU prefixes (tu050, k123, m01, etc.) so that PayPay Flea Market
+    and Mercari return maximum matching results.
     """
     if not title:
         return ""
@@ -45,7 +46,7 @@ def extract_main_flea_keyword(title: str) -> str:
     # 1. Remove bracketed noise
     clean = re.sub(r'【[^】]*】|『[^』]*』|「[^」]*」|\[[^\]]*\]|\([^\)]*\)|（[^）]*）|《[^》]*》', ' ', clean)
     # 2. Remove symbols and decorators
-    clean = re.sub(r'[☆★◆◇■□▲△▼▽◎○※・！!？?♪～~_、|/&+\\•#]', ' ', clean)
+    clean = re.sub(r'[☆★◆◇■□▲△▼▽◎○※・！!？?♪～~_、|/&+\\•#…\.]', ' ', clean)
     # 3. Remove auction prices & 1-yen phrases
     clean = re.sub(r'[0-9]+円開始|[0-9]+円スタート|[0-9]+円〜?|1円〜?|1円', ' ', clean)
     # 4. Remove auction spam & condition noise
@@ -56,13 +57,28 @@ def extract_main_flea_keyword(title: str) -> str:
         r'送料無料|送料込|即決|早い者勝ち|正規品|限定品|限定|セール|大人気|人気|格安|激安',
         r'まとめ売り|まとめ|セット|一式|おまけ付き|おまけ|お買い得|注目|希少|レア|当時物|レトロ',
         r'箱付き|元箱|外箱|箱あり|箱なし|本体のみ|本体|付属品多数|付属品完備|欠品あり|欠品|専用|対応|純正',
-        r'レンズキット|ボディ|トリプルブラック|ジェットブラック|スペースグレイ|ホワイト|ブラック|シルバー|ゴールド'
+        r'レンズキット|ボディ|トリプルブラック|ジェットブラック|スペースグレイ|ホワイト|ブラック|シルバー|ゴールド|別売.*'
     ]
     for np in noise_patterns:
         clean = re.sub(np, ' ', clean, flags=re.IGNORECASE)
     # 5. Remove standalone specs
     clean = re.sub(r'\b[0-9]+(?:GB|TB|MB)\b|\b[0-9]+(?:\.[0-9]+)?インチ\b|第[0-9]+世代', ' ', clean, flags=re.IGNORECASE)
-    # 6. Remove generic long category descriptors
+
+    # 6. Normalize redundant platform names:
+    # "Play Station 5" or "PlayStation 5" or "プレイステーション5" -> "PS5"
+    clean = re.sub(r'Play\s*Station\s*5|PlayStation\s*5|プレイステーション\s*5', 'PS5', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'Play\s*Station\s*4|PlayStation\s*4|プレイステーション\s*4', 'PS4', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'Play\s*Station\s*3|PlayStation\s*3|プレイステーション\s*3', 'PS3', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'Play\s*Station|PlayStation|プレイステーション', 'PS', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'Nintendo\s*Switch|ニンテンドースイッチ', 'Switch', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'\bPS5\s+PS5\b', 'PS5', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'\bPS4\s+PS4\b', 'PS4', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'\bSwitch\s+Switch\b', 'Switch', clean, flags=re.IGNORECASE)
+
+    # 7. Strip generic media/game filler words: ソフト, カセット, ディスク, ゲーム
+    clean = re.sub(r'\b(ソフト|カセット|ディスク|ゲームソフト|ゲーム)\b', ' ', clean)
+
+    # 8. Remove generic long category descriptors
     category_noise = [
         r'ワイヤレスノイズキャンセリングヘッドホン|ノイズキャンセリングヘッドホン|ワイヤレスヘッドホン|ヘッドホン|イヤホン',
         r'ブルーレイレコーダー|DVDレコーダー|レコーダー',
@@ -72,7 +88,15 @@ def extract_main_flea_keyword(title: str) -> str:
     for cn in category_noise:
         clean = re.sub(cn, ' ', clean, flags=re.IGNORECASE)
 
-    raw_words = [w.strip() for w in clean.split() if len(w.strip()) > 1]
+    raw_words = [w.strip() for w in clean.split() if len(w.strip()) > 0]
+    if not raw_words:
+        return title.strip()
+
+    # 9. Strip seller SKU / inventory prefix codes at the start of title (e.g. tu050, k123, m-004, a12, 管01, etc.)
+    sku_pattern = re.compile(r'^[a-zA-Z]{1,3}[-_]?[0-9]{2,6}$|^[0-9]{3,6}$')
+    while raw_words and (sku_pattern.match(raw_words[0]) or re.match(r'^(?:管|棚|箱|倉庫|No|SKU)[-_0-9A-Za-z]+$', raw_words[0])):
+        raw_words.pop(0)
+
     if not raw_words:
         return title.strip()
 
@@ -96,7 +120,7 @@ def extract_main_flea_keyword(title: str) -> str:
         if not skip:
             words.append(w)
 
-    # Search for hyphenated model codes first (most specific: BP-500DX2, CUH-7200B, WH-1000XM4, DMR-BRW1020, DDJ-400)
+    # Search for hyphenated model codes first (most specific: BP-500DX2, CFI-1200B, CUH-7200B, WH-1000XM4, DMR-BRW1020, DDJ-400)
     hyphen_model_regex = re.compile(r'^[A-Za-z0-9]+[-_][A-Za-z0-9]+$')
     model_idx = -1
     for idx, w in enumerate(words):
@@ -108,7 +132,7 @@ def extract_main_flea_keyword(title: str) -> str:
     if model_idx == -1:
         other_model_regex = re.compile(r'^[0-9]{3,4}[A-Za-z]?$|^[A-Z][0-9]$|^[A-Z]+[0-9]+$')
         for idx, w in enumerate(words):
-            if w.upper() in ['PS4', 'PS5', 'PS3', 'PS2']:
+            if w.upper() in ['PS4', 'PS5', 'PS3', 'PS2', 'PS']:
                 continue
             if other_model_regex.match(w):
                 model_idx = idx
@@ -123,7 +147,7 @@ def extract_main_flea_keyword(title: str) -> str:
         selected = words[start_idx:end_idx]
         return ' '.join(selected)
 
-    # Fallback: top 2-3 informative words
+    # Fallback: top 2-3 informative words (e.g. 'PS5 紅の砂漠')
     return ' '.join(words[:3])
 
 def analyze_condition_and_defects(title: str, description: str = "", condition_str: str = "") -> Dict[str, Any]:
@@ -632,6 +656,7 @@ def search_yahoo_auctions(query: str, limit: int = 12, sort: str = "default") ->
             # Inbound shipping extraction (Accurately detect Yahoo Auction shipping traps!)
             is_free_shipping = bool(it.get("isFreeShipping"))
             shipping_fee = 0
+            shipping_estimated = False
             if not is_free_shipping:
                 if it.get("currentPriceShippingFee") is not None:
                     try:
@@ -649,12 +674,22 @@ def search_yahoo_auctions(query: str, limit: int = 12, sort: str = "default") ->
                     except Exception:
                         shipping_fee = 0
 
+                # Shipping trap protection: If buyer pays shipping but fee is 0 / unstated, estimate standard carrier fee
+                if shipping_fee == 0:
+                    t_low = (it.get("title", "") or "").lower()
+                    if any(k in t_low for k in ['ソフト', 'カセット', 'ディスク', 'ゲーム', 'cd', 'dvd', 'トレカ']):
+                        shipping_fee = 250
+                    else:
+                        shipping_fee = 750
+                    shipping_estimated = True
+
             total_procurement = price + shipping_fee
 
             # Condition, Box, Junk & Defect quick analysis for search card
             cond_meta = analyze_condition_and_defects(title=it.get("title", ""))
 
             # Real Flea Market 2-3 page sold average calculation
+            has_flea_data = False
             try:
                 from backend.market_radar import get_flea_market_real_sold_stats, estimate_real_flea_price
                 flea_stats = get_flea_market_real_sold_stats(it.get("title", ""), max_pages=2)
@@ -663,33 +698,45 @@ def search_yahoo_auctions(query: str, limit: int = 12, sort: str = "default") ->
                     flea_sample_count = flea_stats.get("sample_count", 0)
                     flea_min = flea_stats.get("min_sold_price", 0)
                     flea_max = flea_stats.get("max_sold_price", 0)
+                    has_flea_data = True
                 else:
                     market_est = estimate_real_flea_price(it.get("title", ""), total_procurement)
-                    target_sell = market_est["sweet_spot"]
-                    flea_sample_count = market_est.get("sample_count", 0)
-                    flea_min = market_est.get("min_sold", 0)
-                    flea_max = market_est.get("max_sold", 0)
+                    if market_est.get("is_custom_spec"):
+                        target_sell = market_est["sweet_spot"]
+                        flea_sample_count = market_est.get("sample_count", 0)
+                        flea_min = market_est.get("min_sold", 0)
+                        flea_max = market_est.get("max_sold", 0)
+                        has_flea_data = True
+                    else:
+                        target_sell = 0
+                        flea_sample_count = 0
+                        flea_min = 0
+                        flea_max = 0
+                        has_flea_data = False
             except Exception:
-                target_sell = round((total_procurement + 500) * 1.20)
+                target_sell = 0
                 flea_sample_count = 0
                 flea_min = 0
                 flea_max = 0
+                has_flea_data = False
 
-            # Adjust sell price based on box presence or junk status
-            if cond_meta["junk"]["is_junk"]:
-                target_sell = max(round(target_sell * 0.70), 500)
-            elif cond_meta["box"]["has_box"] is True:
-                target_sell = round(target_sell * 1.05)
-            elif cond_meta["box"]["has_box"] is False:
-                target_sell = round(target_sell * 0.95)
+            if has_flea_data and target_sell > 0:
+                if cond_meta["junk"]["is_junk"]:
+                    target_sell = max(round(target_sell * 0.70), 500)
+                elif cond_meta["box"]["has_box"] is True:
+                    target_sell = round(target_sell * 1.05)
+                elif cond_meta["box"]["has_box"] is False:
+                    target_sell = round(target_sell * 0.95)
 
-            if target_sell < 1000 and total_procurement > 0:
-                target_sell = total_procurement + 500
-            fee = round(target_sell * 0.05)
-            t_low = (it.get("title", "") or "").lower()
-            ship = 750 if any(k in t_low for k in ['laptop', 'ノートpc', 'ノートパソコン', 'パソコン', 'pc', '15.6', '13.3', '14.0', 'ps5', 'playstation 5', 'ps4']) else 210
-            net_profit = target_sell - total_procurement - fee - ship
-            is_overpriced = bool(net_profit < 0)
+                fee = round(target_sell * 0.05)
+                t_low = (it.get("title", "") or "").lower()
+                ship = 750 if any(k in t_low for k in ['laptop', 'ノートpc', 'ノートパソコン', 'パソコン', 'pc', '15.6', '13.3', '14.0', 'ps5', 'playstation 5', 'ps4']) else 210
+                net_profit = target_sell - total_procurement - fee - ship
+                is_overpriced = bool(net_profit < 0)
+            else:
+                target_sell = 0
+                net_profit = None
+                is_overpriced = False
 
             results.append({
                 "auction_id": auc_id,

@@ -227,10 +227,13 @@ class TestAppEndpoints(unittest.TestCase):
         
         # Test 3: Nintendo Switch OLED
         k3 = extract_main_flea_keyword("【美品】Nintendo Switch 有機ELモデル ホワイト 本体 箱付き 動作確認済み 送料無料")
-        self.assertIn("Nintendo", k3)
         self.assertIn("Switch", k3)
         self.assertNotIn("美品", k3)
         self.assertNotIn("送料無料", k3)
+
+        # Test 5: Seller SKU prefix removal & game software normalization (user exact sample)
+        k5 = extract_main_flea_keyword("tu050 Play Station 5 PS5 ソフト 紅の砂漠 ※中古")
+        self.assertEqual(k5, "PS5 紅の砂漠")
         
         # Test 4: Laptop model
         k4 = extract_main_flea_keyword("DELL Vostro 3580 Core i5 8GB SSD 256GB 15.6インチ 動作品")
