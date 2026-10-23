@@ -1012,8 +1012,10 @@ function renderSearchResults(items, query) {
     items.forEach((item, idx) => {
         const card = document.createElement("div");
         const isSelected = item.auction_id === activeSearchAuctionId;
+        const isJunk = Boolean(item.is_junk);
         card.id = `search-card-${item.auction_id}`;
-        card.className = `cursor-pointer rounded-xl p-2.5 transition-all text-left border relative group bg-white hover:border-red-500 hover:shadow-md ${isSelected ? 'border-red-500 ring-2 ring-red-400/50 bg-red-50/20' : 'border-slate-200'}`;
+        card.className = `cursor-pointer rounded-xl p-2.5 transition-all text-left border relative group bg-white hover:border-red-500 hover:shadow-md ${isJunk ? 'border-rose-400 bg-rose-50/30' : (isSelected ? 'border-red-500 ring-2 ring-red-400/50 bg-red-50/20' : 'border-slate-200')}`;
+        
         const buyPrice = parseInt(item.buy_price) || 0;
         const shipFee = parseInt(item.shipping_fee) || 0;
         const isFreeShip = Boolean(item.is_free_shipping);
@@ -1053,6 +1055,13 @@ function renderSearchResults(items, query) {
                 <span>⏰ ${item.remaining_time}</span>
             </span>` : (item.is_fixed_price ? '<span class="absolute top-1 right-1 bg-blue-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-xs">⚡ Buy Now</span>' : '');
 
+        const junkBadgeHtml = isJunk ? 
+            '<span class="absolute top-1 left-7 bg-rose-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-xs animate-pulse">🚨 JUNK</span>' : '';
+
+        const boxBadgeHtml = item.has_box === true ? 
+            '<span class="bg-emerald-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-2xs">📦 箱あり</span>' : 
+            (item.has_box === false ? '<span class="bg-slate-700 text-slate-200 text-[8px] font-medium px-1 py-0.5 rounded shadow-2xs">📦 本体のみ</span>' : '');
+
         const shippingBadgeHtml = isFreeShip ? 
             '<span class="absolute bottom-1 right-1 bg-emerald-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-2xs">送料無料 (Free)</span>' : 
             (shipFee > 0 ? 
@@ -1060,30 +1069,40 @@ function renderSearchResults(items, query) {
                 '<span class="absolute bottom-1 right-1 bg-amber-700 text-white text-[8px] font-bold px-1.5 py-0.5 rounded shadow-2xs">送料落札者負担</span>'
             );
 
+        const defectRowHtml = (item.has_damage || item.defect_summary) ? 
+            `<div class="bg-amber-50 border border-amber-300 text-amber-900 px-1.5 py-0.5 rounded text-[9px] font-bold flex items-center space-x-1 mt-1">
+                <span>⚠️ ${item.defect_summary || 'Damage/Toota hua'}</span>
+            </div>` : '';
+
         card.innerHTML = `
             <div class="relative w-full h-24 rounded-lg overflow-hidden bg-slate-100 mb-1.5 border border-slate-100">
                 <img src="${imgUrl}" alt="${item.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" onerror="this.src='https://placehold.co/150x150?text=No+Photo'">
                 <span class="absolute top-1 left-1 bg-black/70 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">#${idx+1}</span>
+                ${junkBadgeHtml}
                 ${shippingBadgeHtml}
                 ${sellBadge}
                 ${timeBadgeHtml}
             </div>
 
-            <!-- Auction Time Left & Bids Bar -->
+            <!-- Auction Time Left, Box Badge & Bids Bar -->
             <div class="flex items-center justify-between text-[10px] mb-1.5 px-0.5 font-bold">
                 <span class="flex items-center space-x-1 ${item.is_ending_soon ? 'text-rose-600 font-extrabold' : 'text-slate-600'}">
                     <i data-lucide="clock" class="w-3 h-3 ${item.is_ending_soon ? 'text-rose-600' : 'text-slate-400'}"></i>
                     <span>${item.remaining_time || (item.is_fixed_price ? '⚡ Buy Now' : 'Live Auction')}</span>
                 </span>
-                <span class="text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200/60 text-[9px]">
-                    ${item.is_fixed_price ? '⚡ Instant' : `${item.bids || 0} bids`}
-                </span>
+                <div class="flex items-center space-x-1">
+                    ${boxBadgeHtml}
+                    <span class="text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200/60 text-[9px]">
+                        ${item.is_fixed_price ? '⚡ Instant' : `${item.bids || 0} bids`}
+                    </span>
+                </div>
             </div>
 
-            <div class="font-bold text-slate-800 text-[11px] line-clamp-2 leading-tight mb-2 h-7" title="${item.title}">
+            <div class="font-bold text-slate-800 text-[11px] line-clamp-2 leading-tight mb-1 h-7" title="${item.title}">
                 ${item.title}
             </div>
-            <div class="space-y-1 pt-1 border-t border-slate-100 text-[10px]">
+            ${defectRowHtml}
+            <div class="space-y-1 pt-1 border-t border-slate-100 text-[10px] mt-1">
                 <div class="flex justify-between items-center text-slate-500">
                     <span>🛒 Bid / Buy:</span>
                     <b class="text-blue-700 font-bold text-xs">¥${buyPrice.toLocaleString()}</b>
@@ -1457,6 +1476,27 @@ function populateScrapedData(data) {
     // Fetch and display Live Verified Completed Sales from Yahoo Flea Market
     loadLiveFleaSold(data.title, data.live_flea_sold);
 
+    // Update JUNK Warning Alert
+    const junkAlert = document.getElementById("top-junk-alert");
+    const junkReasons = document.getElementById("top-junk-reasons");
+    if (junkAlert) {
+        if (data.is_junk) {
+            junkAlert.classList.remove("hidden");
+            if (junkReasons) {
+                const reasons = (data.junk_reasons && data.junk_reasons.length > 0) ? data.junk_reasons : ["JUNK / 故障品 tag detected"];
+                junkReasons.innerHTML = reasons.map(r => `<span class="bg-rose-200 text-rose-900 px-2 py-0.5 rounded font-black">${r}</span>`).join('');
+            }
+        } else {
+            junkAlert.classList.add("hidden");
+        }
+    }
+
+    // Render Condition & Defect Inspector Card (Cracks, scratches, loose unit)
+    renderConditionInspector(data);
+
+    // Update Box vs Unit-Only Pricing Buttons
+    updateBoxPricingUI(data);
+
     // Update live auction time and bids in Box 1
     const bannerTime = document.getElementById("banner-auction-time");
     if (bannerTime) {
@@ -1477,6 +1517,146 @@ function populateScrapedData(data) {
         }
     }
 
+    runLiveCalculation();
+}
+
+let currentBoxState = null;
+let currentBoxPrices = { with_box: 0, no_box: 0 };
+
+// Render Condition & Defect Inspector Card
+function renderConditionInspector(data) {
+    const boxBadge = document.getElementById("inspector-box-badge");
+    const defectsList = document.getElementById("inspector-defects-list");
+    const statusIcon = document.getElementById("inspector-status-icon");
+
+    // Box Badge
+    if (boxBadge) {
+        if (data.has_box === true) {
+            boxBadge.innerHTML = `<span class="px-2.5 py-1 rounded-lg text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-300">📦 箱付き (With Box / +18% Value)</span>`;
+        } else if (data.has_box === false) {
+            boxBadge.innerHTML = `<span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-800 border border-slate-300">📦 本体のみ (No Box / Loose Unit)</span>`;
+        } else {
+            boxBadge.innerHTML = `<span class="px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-50 text-slate-500 border border-slate-200">📦 箱の有無未記載</span>`;
+        }
+    }
+
+    // Status Icon
+    if (statusIcon) {
+        if (data.is_junk) {
+            statusIcon.innerText = "🚨";
+            statusIcon.className = "w-7 h-7 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center font-bold text-sm animate-pulse";
+        } else if (data.has_damage) {
+            statusIcon.innerText = "⚠️";
+            statusIcon.className = "w-7 h-7 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-sm";
+        } else {
+            statusIcon.innerText = "✅";
+            statusIcon.className = "w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-sm";
+        }
+    }
+
+    // Defects list
+    if (defectsList) {
+        const defects = data.defects || [];
+        if (defects.length > 0) {
+            defectsList.innerHTML = defects.map(d => {
+                const isDmg = d.category === 'damage';
+                const bg = isDmg ? 'bg-rose-50 border-rose-200 text-rose-900' : (d.category === 'functional' ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-blue-50 border-blue-200 text-blue-900');
+                const badgeBg = isDmg ? 'bg-rose-200 text-rose-800' : (d.category === 'functional' ? 'bg-amber-200 text-amber-800' : 'bg-blue-200 text-blue-800');
+                const icon = isDmg ? '🔴 Toota hua / Damaged' : (d.category === 'functional' ? '🟡 Defect Note' : '🔵 Scratch / Cosmetic');
+                return `
+                    <div class="p-2.5 rounded-xl border ${bg} flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                        <div class="space-y-0.5">
+                            <div class="flex items-center space-x-1.5">
+                                <span class="text-[10px] font-black px-1.5 py-0.5 rounded ${badgeBg}">${icon}</span>
+                                <b class="text-xs font-bold">${d.label_ur}</b>
+                            </div>
+                            <p class="text-[11px] font-mono text-slate-700 bg-white/70 px-2 py-1 rounded border border-slate-200/60 mt-1">
+                                "${d.snippet}"
+                            </p>
+                        </div>
+                        <span class="text-[10px] font-semibold text-slate-500 whitespace-nowrap self-end sm:self-center">${d.label_ja}</span>
+                    </div>
+                `;
+            }).join('');
+        } else {
+            defectsList.innerHTML = `
+                <div class="p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl text-emerald-800 flex items-center space-x-2 text-xs font-medium">
+                    <span class="text-base">✅</span>
+                    <span>Description me koi toota hua (damage/crack/defect) nahi mila! Product is functional.</span>
+                </div>
+            `;
+        }
+    }
+}
+
+// Update Box Pricing UI with calculated figures
+function updateBoxPricingUI(data) {
+    const sug = data.suggestions || {};
+    const boxPricing = sug.box_pricing || {};
+    currentBoxState = data.has_box;
+    currentBoxPrices.with_box = boxPricing.price_with_box || Math.round(((data.buy_price || 0) + 2000) * 1.35 * 1.18);
+    currentBoxPrices.no_box = boxPricing.price_no_box || Math.round(((data.buy_price || 0) + 2000) * 1.35 * 0.90);
+
+    const valWith = document.getElementById("box-val-with");
+    if (valWith) valWith.innerText = `¥${currentBoxPrices.with_box.toLocaleString()}`;
+
+    const valWithout = document.getElementById("box-val-without");
+    if (valWithout) valWithout.innerText = `¥${currentBoxPrices.no_box.toLocaleString()}`;
+
+    const badge = document.getElementById("calc-box-badge");
+    if (badge) {
+        if (currentBoxState === true) {
+            badge.innerText = "箱付き (+18% Value)";
+            badge.className = "text-[10px] font-black px-2 py-0.5 rounded text-emerald-800 bg-emerald-50 border border-emerald-300";
+        } else if (currentBoxState === false) {
+            badge.innerText = "本体のみ (Unit Only)";
+            badge.className = "text-[10px] font-black px-2 py-0.5 rounded text-slate-700 bg-slate-100 border border-slate-300";
+        } else {
+            badge.innerText = "箱状態未確認";
+            badge.className = "text-[10px] font-medium px-2 py-0.5 rounded text-slate-500 bg-slate-50 border border-slate-200";
+        }
+    }
+
+    renderBoxToggleButtons(currentBoxState === true);
+}
+
+function renderBoxToggleButtons(isWithBox) {
+    const btnWith = document.getElementById("btn-toggle-box-with");
+    const btnWithout = document.getElementById("btn-toggle-box-without");
+
+    if (btnWith && btnWithout) {
+        if (isWithBox) {
+            btnWith.className = "py-2 px-2.5 rounded-xl font-bold border-2 transition text-left bg-emerald-50/70 border-emerald-500 shadow-xs ring-2 ring-emerald-300/40";
+            btnWithout.className = "py-2 px-2.5 rounded-xl font-bold border-2 transition text-left bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-300 opacity-70";
+        } else {
+            btnWith.className = "py-2 px-2.5 rounded-xl font-bold border-2 transition text-left bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-300 opacity-70";
+            btnWithout.className = "py-2 px-2.5 rounded-xl font-bold border-2 transition text-left bg-slate-100 border-slate-700 shadow-xs ring-2 ring-slate-300/40 text-slate-900";
+        }
+    }
+}
+
+function toggleBoxPricing(isWithBox) {
+    currentBoxState = isWithBox;
+    renderBoxToggleButtons(isWithBox);
+
+    const chosenPrice = isWithBox ? currentBoxPrices.with_box : currentBoxPrices.no_box;
+    const sellPriceEl = document.getElementById("calc-sell-price");
+    if (sellPriceEl && chosenPrice > 0) {
+        sellPriceEl.value = chosenPrice;
+    }
+
+    const badge = document.getElementById("calc-box-badge");
+    if (badge) {
+        if (isWithBox) {
+            badge.innerText = "箱付き (+18% Value applied)";
+            badge.className = "text-[10px] font-black px-2 py-0.5 rounded text-emerald-800 bg-emerald-50 border border-emerald-300";
+        } else {
+            badge.innerText = "本体のみ (Unit Only applied)";
+            badge.className = "text-[10px] font-black px-2 py-0.5 rounded text-slate-700 bg-slate-100 border border-slate-300";
+        }
+    }
+
+    showToast(isWithBox ? `Applied Box Price: ¥${chosenPrice.toLocaleString()}` : `Applied Unit-Only Price: ¥${chosenPrice.toLocaleString()}`);
     runLiveCalculation();
 }
 
@@ -1719,6 +1899,7 @@ function setPlatform(platform) {
     runLiveCalculation();
 }
 
+
 // Outbound Shipping Method Select Change
 function onShippingMethodChange() {
     const select = document.getElementById("calc-shipping-method");
@@ -1727,6 +1908,7 @@ function onShippingMethodChange() {
     if (shipOut) shipOut.value = cost;
     runLiveCalculation();
 }
+
 
 // Run Live Calculation & Update High-Contrast Comparison Banner
 async function runLiveCalculation() {
@@ -1746,13 +1928,28 @@ async function runLiveCalculation() {
                 sell_price: sellPrice,
                 shipping_out: shippingOut,
                 packaging_cost: packaging,
-                platform: currentPlatform
+                platform: currentPlatform,
+                has_box: currentBoxState
             })
         });
         const data = await res.json();
         const calc = data.calc;
         const sug = data.suggestions;
         currentSuggestions = sug;
+
+        // Dynamically sync Box vs Unit-Only prices from calculate suggestions
+        if (sug && sug.box_pricing) {
+            currentBoxPrices.with_box = sug.box_pricing.price_with_box;
+            currentBoxPrices.no_box = sug.box_pricing.price_no_box;
+            const valWith = document.getElementById("box-val-with");
+            if (valWith && sug.box_pricing.price_with_box) {
+                valWith.innerText = `¥${sug.box_pricing.price_with_box.toLocaleString()}`;
+            }
+            const valWithout = document.getElementById("box-val-without");
+            if (valWithout && sug.box_pricing.price_no_box) {
+                valWithout.innerText = `¥${sug.box_pricing.price_no_box.toLocaleString()}`;
+            }
+        }
 
         // 1. UPDATE TOP ARBITRAGE PRICE FLOW BANNER (WHERE WE BUY VS WHERE WE SELL VS PROFIT)
         const bannerBuy = document.getElementById("banner-buy-price");
@@ -2238,3 +2435,4 @@ window.filterSuggestions = filterSuggestions;
 window.loadSuggestedProduct = loadSuggestedProduct;
 window.loadSuggestions = loadSuggestions;
 window.updateSellabilityCard = updateSellabilityCard;
+window.toggleBoxPricing = toggleBoxPricing;

@@ -33,6 +33,107 @@ def normalize_auction_url(input_str: str) -> str:
         return input_str
     return f"https://page.auctions.yahoo.co.jp/jp/auction/{input_str}"
 
+def analyze_condition_and_defects(title: str, description: str = "", condition_str: str = "") -> Dict[str, Any]:
+    """
+    Intelligently analyzes Yahoo Auction title, description & condition for:
+    1. Box presence: 箱あり (With Box / Premium Price) vs 本体のみ (Unit Only / Discounted)
+    2. JUNK detection: ジャンク / 故障品 / 不動品 / 通電のみ (Dangerous for reselling!)
+    3. Defect & damage extraction: 割れ (Cracked), 欠け (Chipped), 凹み (Dented), 傷 (Scratches), 訳あり (Flawed)
+    """
+    full_text = f"{title or ''} {description or ''} {condition_str or ''}"
+    
+    # 1. Box Analysis (箱あり vs 本体のみ)
+    box_negative = re.search(r'(本体のみ|箱なし|元箱なし|外箱なし|化粧箱なし|箱欠品|箱・付属品なし|箱はありません|箱は付属しません|箱等は付属|付属品はありません)', full_text)
+    box_positive = re.search(r'(箱付き|箱あり|元箱あり|元箱付き|化粧箱付き|化粧箱あり|外箱あり|外箱付き|箱・説明書付き|箱説あり|箱説付き|化粧箱・説明書|元箱|化粧箱|外箱)', full_text)
+    
+    if box_negative:
+        has_box = False
+        box_phrase = box_negative.group(0)
+        box_badge = "📦 本体のみ (No Box)"
+        box_impact = "-15% Market Price (Unit Only)"
+    elif box_positive:
+        has_box = True
+        box_phrase = box_positive.group(0)
+        box_badge = "📦 箱付き (With Box)"
+        box_impact = "+18% Premium (Full Set)"
+    else:
+        has_box = None
+        box_phrase = None
+        box_badge = "📦 箱不明 (No Box Mentioned)"
+        box_impact = "Standard Unit Price"
+
+    # 2. Junk Detection (ジャンク / 故障品 / 不動品)
+    junk_patterns = [
+        (r'ジャンク|JUNK|junk', 'Junk (ジャンク品)'),
+        (r'故障品|故障', 'Out of order / Broken (故障品)'),
+        (r'不動品|不動', 'Non-working (不動品)'),
+        (r'部品取り', 'For parts only (部品取り)'),
+        (r'動作未確認', 'Operation unverified (動作未確認)'),
+        (r'通電のみ|通電確認のみ|通電OK動作未確認', 'Power on only / Untested (通電のみ)'),
+        (r'修理前提', 'Requires repair (修理前提)'),
+        (r'ジャンク扱い|ジャンク品として', 'Treated as junk (ジャンク扱い)'),
+        (r'起動しない|映らない|電源が入らない', 'Does not power on (起動不可)'),
+        (r'全体的に状態が悪い', 'Overall condition: Bad (状態が悪い)')
+    ]
+    junk_reasons = []
+    for p, label in junk_patterns:
+        if re.search(p, full_text, re.IGNORECASE):
+            junk_reasons.append(label)
+    
+    is_junk = len(junk_reasons) > 0
+
+    # 3. Defect & Flaw Details (Toota hua / Cracked / Chipped / Dented / Defect)
+    defect_rules = [
+        ("割れ・ヒビ (Cracked/Broken)", "Toota hua / Hairline crack", r'([^。、\n]{0,25}(?:割れ|ヒビ|ひび割れ|クラック)[^。、\n]{0,25})', "damage", "high"),
+        ("欠け・欠損・破損 (Chipped/Damaged)", "Thora toota / chipped piece", r'([^。、\n]{0,25}(?:欠け|欠損|折れ|破損|一部破損)[^。、\n]{0,25})', "damage", "high"),
+        ("凹み・変形 (Dented/Bent)", "Pichka hua / dented part", r'([^。、\n]{0,25}(?:凹み|へこみ|変形|歪み)[^。、\n]{0,25})', "damage", "medium"),
+        ("訳あり・難あり (Flawed/Defect Note)", "Problem / Defect maujood hai", r'([^。、\n]{0,25}(?:訳あり|ワケあり|難あり)[^。、\n]{0,25})', "functional", "high"),
+        ("機能不良 (Button/Function issue)", "Button ya feature me issue hai", r'([^。、\n]{0,25}(?:反応が悪い|効きが悪い|接触不良|ボタン不良|ドリフト|ノイズ|異音)[^。、\n]{0,25})', "functional", "high"),
+        ("目立つ傷・スレ (Scratched/Scuffed)", "Noticeable scratches / marks", r'([^。、\n]{0,25}(?:傷があり|キズがあり|目立つ傷|キズ多め|深い傷|画面に傷|液晶に傷|スレあり)[^。、\n]{0,25})', "cosmetic", "medium"),
+        ("汚れ・変色 (Stains/Yellowing)", "Daag / Yellowing / Smell", r'([^。、\n]{0,25}(?:黄ばみ|変色|タバコ|ヤニ|汚れあり|強い使用感)[^。、\n]{0,25})', "cosmetic", "low")
+    ]
+
+    detected_defects = []
+    seen_snippets = set()
+    for label_ja, label_ur, pattern, cat, severity in defect_rules:
+        for m in re.finditer(pattern, full_text):
+            snip = m.group(1).strip()
+            snip = re.sub(r'^[、。\s]+|[、。\s]+$', '', snip)
+            if snip and snip not in seen_snippets and len(snip) >= 3:
+                seen_snippets.add(snip)
+                detected_defects.append({
+                    "category": cat,
+                    "severity": severity,
+                    "label_ja": label_ja,
+                    "label_ur": label_ur,
+                    "snippet": snip
+                })
+
+    has_damage = any(d["category"] == "damage" for d in detected_defects)
+    has_functional_defect = any(d["category"] == "functional" for d in detected_defects)
+
+    return {
+        "box": {
+            "has_box": has_box,
+            "phrase": box_phrase,
+            "badge_text": box_badge,
+            "impact": box_impact
+        },
+        "junk": {
+            "is_junk": is_junk,
+            "reasons": junk_reasons[:4],
+            "badge_text": "🚨 JUNK / 故障品" if is_junk else None,
+            "warning_ur": "⚠️ YE JUNK / KHARAB ITEM HAI! (Not working / Parts only). Isko theek kiye baghair normal flea market par mat bechein!" if is_junk else ""
+        },
+        "has_box": has_box,
+        "is_junk": is_junk,
+        "junk_reasons": junk_reasons[:4],
+        "defects": detected_defects[:6],
+        "has_damage": has_damage,
+        "has_functional_defect": has_functional_defect,
+        "defect_summary": detected_defects[0]["label_ur"] if detected_defects else ""
+    }
+
 def scrape_yahoo_auction(url_or_id: str) -> Dict[str, Any]:
     """
     Scrapes a Yahoo Auction page and returns structured details.
@@ -295,6 +396,9 @@ def scrape_yahoo_auction(url_or_id: str) -> Dict[str, Any]:
         is_ending_soon = bool(left_sec is not None and 0 < left_sec < 7200)
         is_fixed_price = bool(buy_it_now_price > 0 and (buy_price == 0 or buy_price == buy_it_now_price))
 
+        # Deep Condition, Box, Junk & Defect Analysis
+        cond_analysis = analyze_condition_and_defects(title=title, description=description, condition_str=condition)
+
         return {
             "success": True,
             "auction_id": auc_id,
@@ -304,6 +408,14 @@ def scrape_yahoo_auction(url_or_id: str) -> Dict[str, Any]:
             "buy_it_now_price": buy_it_now_price,
             "description": description,
             "condition": condition,
+            "condition_analysis": cond_analysis,
+            "has_box": cond_analysis["box"]["has_box"],
+            "box_badge": cond_analysis["box"]["badge_text"],
+            "box_impact": cond_analysis["box"]["impact"],
+            "is_junk": cond_analysis["junk"]["is_junk"],
+            "junk_reasons": cond_analysis["junk"]["reasons"],
+            "defects": cond_analysis["defects"],
+            "has_damage": cond_analysis["has_damage"],
             "shipping_buyer_pays": shipping_buyer_pays,
             "shipping_text": shipping_text,
             "estimated_inbound_shipping": estimated_inbound_shipping,
@@ -436,7 +548,10 @@ def search_yahoo_auctions(query: str, limit: int = 12, sort: str = "default") ->
 
             total_procurement = price + shipping_fee
 
-            # Projected selling price (Hardware spec-aware estimation based on total buy cost)
+            # Condition, Box, Junk & Defect quick analysis for search card
+            cond_meta = analyze_condition_and_defects(title=it.get("title", ""))
+
+            # Projected selling price (Hardware spec-aware estimation based on total buy cost & box status)
             try:
                 from backend.market_radar import estimate_real_flea_price
                 market_est = estimate_real_flea_price(it.get("title", ""), total_procurement)
@@ -446,6 +561,14 @@ def search_yahoo_auctions(query: str, limit: int = 12, sort: str = "default") ->
                     target_sell = round((total_procurement + 500) * 1.35)
             except Exception:
                 target_sell = round((total_procurement + 500) * 1.35)
+
+            # Adjust sell price based on box presence or junk status
+            if cond_meta["junk"]["is_junk"]:
+                target_sell = max(round(total_procurement * 1.15), total_procurement + 300)
+            elif cond_meta["box"]["has_box"] is True:
+                target_sell = round(target_sell * 1.15)  # Box premium
+            elif cond_meta["box"]["has_box"] is False:
+                target_sell = max(round(target_sell * 0.90), total_procurement + 300)  # Unit only
 
             if target_sell < 1000 and total_procurement > 0:
                 target_sell = total_procurement + 500
@@ -466,6 +589,12 @@ def search_yahoo_auctions(query: str, limit: int = 12, sort: str = "default") ->
                 "url": f"https://page.auctions.yahoo.co.jp/jp/auction/{auc_id}",
                 "target_sell_price": target_sell,
                 "estimated_profit": net_profit,
+                "has_box": cond_meta["box"]["has_box"],
+                "box_badge": cond_meta["box"]["badge_text"],
+                "is_junk": cond_meta["junk"]["is_junk"],
+                "junk_reasons": cond_meta["junk"]["reasons"],
+                "has_damage": cond_meta["has_damage"],
+                "defect_summary": cond_meta["defect_summary"],
                 "bids": bids_count,
                 "remaining_time": rem_time_str,
                 "left_seconds": round(left_sec) if left_sec is not None else None,

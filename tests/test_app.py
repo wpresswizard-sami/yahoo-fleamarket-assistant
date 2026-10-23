@@ -157,5 +157,57 @@ class TestAppEndpoints(unittest.TestCase):
         self.assertEqual(calc["net_profit"], -657)
         self.assertFalse(calc["is_profitable"])
 
+    def test_10_box_pricing_and_condition_detection(self):
+        from backend.scraper import analyze_condition_and_defects
+        
+        # Test 1: Boxed item
+        res_box = analyze_condition_and_defects("Nintendo Switch 箱付き 美品", "付属品完備", "目立った傷や汚れなし")
+        self.assertTrue(res_box["has_box"])
+        self.assertFalse(res_box["is_junk"])
+        
+        # Test 2: Unit only item
+        res_loose = analyze_condition_and_defects("PS4 本体のみ コントローラーなし", "箱はありません", "やや傷や汚れあり")
+        self.assertFalse(res_loose["has_box"])
+        
+        # Test 3: Calculate endpoint returns box_pricing
+        res = client.post("/api/calculate", json={
+            "buy_price": 10000,
+            "inbound_shipping": 0,
+            "sell_price": 15000,
+            "shipping_out": 210,
+            "packaging_cost": 0,
+            "platform": "yahoo_flea",
+            "has_box": True
+        })
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertIn("box_pricing", data["suggestions"])
+        box_p = data["suggestions"]["box_pricing"]
+        self.assertGreater(box_p["price_with_box"], box_p["price_no_box"])
+        self.assertEqual(box_p["has_box"], True)
+
+    def test_11_junk_and_defect_extraction(self):
+        from backend.scraper import analyze_condition_and_defects
+        
+        # Test JUNK detection
+        res_junk = analyze_condition_and_defects(
+            "通電確認のみ ジャンク品 SONY レコーダー 部品取り",
+            "動作未確認のためジャンク扱いでお願いします",
+            "全体的に状態が悪い"
+        )
+        self.assertTrue(res_junk["is_junk"])
+        self.assertGreater(len(res_junk["junk_reasons"]), 0)
+        
+        # Test Damage / Defect extraction
+        res_dmg = analyze_condition_and_defects(
+            "Canon 一眼レフ EOS",
+            "液晶画面にヒビ・割れがあります。ボタンが一部反応しにくいです。",
+            "やや傷や汚れあり"
+        )
+        self.assertTrue(res_dmg["has_damage"])
+        self.assertGreater(len(res_dmg["defects"]), 0)
+        categories = [d["category"] for d in res_dmg["defects"]]
+        self.assertIn("damage", categories)
+
 if __name__ == "__main__":
     unittest.main()

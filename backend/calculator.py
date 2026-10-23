@@ -134,10 +134,11 @@ def suggest_prices(
     shipping_out: int = 210,
     packaging_cost: int = 0,
     platform: str = "yahoo_flea",
-    custom_fee_rate: Optional[float] = None
+    custom_fee_rate: Optional[float] = None,
+    has_box: Optional[bool] = None
 ) -> Dict[str, Any]:
     """
-    Suggest selling prices based on break-even and desired profit margins.
+    Suggest selling prices based on break-even, desired profit margins, and box presence (箱あり vs 本体のみ).
     """
     fee_info = PLATFORM_FEES.get(platform, PLATFORM_FEES["yahoo_flea"])
     fee_rate = custom_fee_rate if custom_fee_rate is not None else fee_info["rate"]
@@ -164,6 +165,13 @@ def suggest_prices(
     margin_25 = price_for_margin(0.25)
     margin_35 = price_for_margin(0.35)
 
+    # 4. Box vs Unit-Only Market Pricing (箱あり vs 本体のみ)
+    # In Japan flea market, boxed complete sets command +15% ~ +20% higher price than loose units
+    base_market = target_2000 if target_2000 > 0 else math.ceil(base_cost * 1.35)
+    price_with_box = math.ceil(round(base_market * 1.18) / 10) * 10
+    price_no_box = math.ceil(round(base_market * 0.90) / 10) * 10
+    box_premium = price_with_box - price_no_box
+
     return {
         "breakeven_price": breakeven_price,
         "target_profit_1000": target_1000,
@@ -172,5 +180,12 @@ def suggest_prices(
         "target_profit_5000": target_5000,
         "margin_15_percent": margin_15,
         "margin_25_percent": margin_25,
-        "margin_35_percent": margin_35
+        "margin_35_percent": margin_35,
+        "box_pricing": {
+            "has_box": has_box,
+            "price_with_box": price_with_box,
+            "price_no_box": price_no_box,
+            "box_premium_yen": box_premium,
+            "box_premium_percent": 18
+        }
     }

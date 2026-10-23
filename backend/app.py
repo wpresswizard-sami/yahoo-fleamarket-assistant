@@ -79,6 +79,7 @@ class CalculateRequest(BaseModel):
     packaging_cost: int = 0
     platform: str = "yahoo_flea"
     custom_fee_rate: Optional[float] = None
+    has_box: Optional[bool] = None
 
 class FormatDescRequest(BaseModel):
     template_id: str = "standard"
@@ -186,14 +187,16 @@ def api_scrape(req: ScrapeRequest):
     )
     result["formatted_description"] = formatted_desc
 
-    # Generate initial price suggestion
+    # Generate initial price suggestion with box awareness
     buy_price = result.get("buy_price", 0)
     inbound = result.get("estimated_inbound_shipping", 0)
+    has_box = result.get("has_box")
     suggestions = suggest_prices(
         buy_price=buy_price,
         inbound_shipping=inbound,
         shipping_out=210,
-        platform="yahoo_flea"
+        platform="yahoo_flea",
+        has_box=has_box
     )
     result["suggestions"] = suggestions
 
@@ -247,7 +250,8 @@ def api_calculate(req: CalculateRequest):
         shipping_out=req.shipping_out,
         packaging_cost=req.packaging_cost,
         platform=req.platform,
-        custom_fee_rate=req.custom_fee_rate
+        custom_fee_rate=req.custom_fee_rate,
+        has_box=req.has_box
     )
     return {
         "calc": calc,

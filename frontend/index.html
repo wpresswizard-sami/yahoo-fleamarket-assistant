@@ -363,6 +363,25 @@
                 </div>
             </div>
 
+            <!-- JUNK & DAMAGE WARNING ALERT BANNER (High Visibility) -->
+            <div id="top-junk-alert" class="hidden bg-rose-600 text-white rounded-2xl p-4 shadow-lg border-2 border-rose-400 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-pulse mb-3">
+                <div class="flex items-start space-x-3">
+                    <span class="text-3xl flex-shrink-0">🚨</span>
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-xs uppercase tracking-wider font-black bg-white text-rose-700 px-2 py-0.5 rounded">JUNK / 故障品 WARNING</span>
+                            <span class="text-xs font-bold text-rose-100">Kharab Item / For Parts Only!</span>
+                        </div>
+                        <p class="text-xs text-rose-100 mt-1 leading-relaxed">
+                            Ye product Yahoo! Auction par <b>JUNK / 故障品 / 不動品</b> ke tor par becha ja raha hai! Isko theek kiye baghair Flea Market par normal price par mat bechein.
+                        </p>
+                    </div>
+                </div>
+                <div id="top-junk-reasons" class="flex flex-wrap gap-1 text-[11px] font-bold text-rose-900 bg-rose-100 px-2.5 py-1.5 rounded-xl border border-rose-200">
+                    <!-- Reasons -->
+                </div>
+            </div>
+
             <!-- SIMPLIFIED 3-STEP ARBITRAGE PRICE FLOW BANNER -->
             <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-5 text-white shadow-lg border border-slate-700/60">
                 <div class="text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-3 flex items-center justify-between">
@@ -616,6 +635,37 @@
                         </div>
                     </div>
 
+                    <!-- Condition & Defect Inspector Card (ダメージ・キズ・破損チェック) -->
+                    <div id="condition-inspector-card" class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                            <div class="flex items-center space-x-2">
+                                <div id="inspector-status-icon" class="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-sm">
+                                    🔍
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-slate-800 text-sm">Condition & Defect Inspector (ダメージ・状態チェック)</h3>
+                                    <span class="text-[10px] text-slate-400">Scans description for JUNK, cracks, broken parts & original box</span>
+                                </div>
+                            </div>
+                            <div id="inspector-box-badge">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-slate-100 text-slate-700 border border-slate-200">📦 Checking...</span>
+                            </div>
+                        </div>
+
+                        <!-- Damage & Defect Snippets (Cracks, scratches, broken parts) -->
+                        <div id="inspector-defects-container" class="space-y-1.5">
+                            <span class="text-[11px] font-bold text-slate-600 flex items-center space-x-1">
+                                <i data-lucide="shield-alert" class="w-3.5 h-3.5 text-amber-500"></i>
+                                <span>Detected Flaws in Description (Toota hua / Damage / Aib):</span>
+                            </span>
+                            <div id="inspector-defects-list" class="space-y-1.5 text-xs">
+                                <div class="p-2.5 bg-slate-50 text-slate-400 rounded-xl text-center text-xs">
+                                    Analyze an auction URL to inspect condition & flaws.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
 
                 <!-- Right Column (5 cols): Simple Live Profit Calculator & Inventory Save -->
@@ -688,6 +738,30 @@
                                         <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-base font-bold text-red-600">¥</span>
                                         <input type="number" id="calc-sell-price" value="0" min="0" oninput="runLiveCalculation()"
                                             class="w-full pl-8 pr-3 py-2 bg-white border border-red-300 rounded-xl text-lg font-black text-red-600 focus:ring-2 focus:ring-red-500">
+                                    </div>
+                                </div>
+
+                                <!-- Box Packaging Status & Price Switcher (箱あり vs 本体のみ) -->
+                                <div class="bg-white p-2.5 rounded-xl border border-red-200/80 space-y-2">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-[11px] font-bold text-slate-700 flex items-center space-x-1">
+                                            <span>📦 Box Status (箱の有無):</span>
+                                        </span>
+                                        <span id="calc-box-badge" class="text-[10px] font-black px-2 py-0.5 rounded text-emerald-800 bg-emerald-50 border border-emerald-300">
+                                            箱あり (+18% Premium)
+                                        </span>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-2 text-xs">
+                                        <button type="button" id="btn-toggle-box-with" onclick="toggleBoxPricing(true)" class="py-2 px-2.5 rounded-xl font-bold border-2 transition text-left bg-emerald-50/70 border-emerald-500 shadow-xs">
+                                            <span class="text-[11px] text-emerald-950 font-black block">📦 箱あり (With Box)</span>
+                                            <b id="box-val-with" class="text-xs font-black text-emerald-700 block mt-0.5">¥--</b>
+                                            <span class="text-[9px] text-emerald-600 block font-semibold">+18% higher market price</span>
+                                        </button>
+                                        <button type="button" id="btn-toggle-box-without" onclick="toggleBoxPricing(false)" class="py-2 px-2.5 rounded-xl font-bold border-2 transition text-left bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-300">
+                                            <span class="text-[11px] text-slate-800 font-bold block">📦 本体のみ (No Box)</span>
+                                            <b id="box-val-without" class="text-xs font-black text-slate-700 block mt-0.5">¥--</b>
+                                            <span class="text-[9px] text-slate-400 block font-medium">Standard loose unit</span>
+                                        </button>
                                     </div>
                                 </div>
 
@@ -947,6 +1021,6 @@
     </div>
 
     <!-- Application Script (Cache-busted) -->
-    <script src="app.js?v=20261023_fulltitle"></script>
+    <script src="app.js?v=20261023_box_junk_defects"></script>
 </body>
 </html>
