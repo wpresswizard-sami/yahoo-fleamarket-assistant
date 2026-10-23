@@ -338,6 +338,46 @@
                         </span>
                     </div>
 
+                    <!-- Flea Market Main Search Keyword Bar (Cleaned & High-Signal) -->
+                    <div class="bg-amber-50/90 p-2.5 rounded-xl border border-amber-200/90 space-y-2">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                            <div class="flex items-center space-x-1.5">
+                                <span class="text-[11px] font-black text-amber-950 flex items-center space-x-1">
+                                    <span>🎯 Main Flea Keyword:</span>
+                                </span>
+                                <span class="text-[10px] text-amber-800 font-bold bg-amber-200/70 px-1.5 py-0.2 rounded border border-amber-300">
+                                    Cleaned (Maximum Competitor Ads)
+                                </span>
+                            </div>
+                            <span class="text-[10px] text-slate-500 font-medium">
+                                Keyword edit karke direct flea search ya sold ads refresh karein
+                            </span>
+                        </div>
+                        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5">
+                            <div class="relative flex-1">
+                                <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-amber-700">🏷️</span>
+                                <input type="text" id="flea-keyword-input" 
+                                    class="w-full pl-8 pr-2.5 py-1.5 bg-white border border-amber-300 rounded-lg text-xs font-bold text-slate-800 focus:ring-2 focus:ring-amber-500 shadow-2xs"
+                                    placeholder="e.g. SONY WH-1000XM4"
+                                    onkeydown="if(event.key==='Enter') searchFleaByKeyword()">
+                            </div>
+                            <div class="flex items-center space-x-1 flex-wrap sm:flex-nowrap">
+                                <button type="button" onclick="searchFleaByKeyword()" class="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-black shadow-xs flex items-center space-x-1 transition cursor-pointer" title="Search live ads on Yahoo Flea Market">
+                                    <span>PayPay Flea</span>
+                                </button>
+                                <button type="button" onclick="searchMercariByKeyword()" class="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-black shadow-xs flex items-center space-x-1 transition cursor-pointer" title="Search live ads on Mercari">
+                                    <span>Mercari</span>
+                                </button>
+                                <button type="button" onclick="reloadLiveFleaSoldWithCurrentKeyword()" class="px-2 py-1.5 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-xs font-bold shadow-2xs transition cursor-pointer" title="Refresh Live Flea Sold Ads">
+                                    🔄 Reload Sold
+                                </button>
+                                <button type="button" onclick="copyFleaKeyword()" class="px-2 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg text-xs font-bold shadow-2xs transition cursor-pointer" title="Copy Main Keyword">
+                                    📋 Copy
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Grid of real sold cards -->
                     <div id="live-flea-sold-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
                         <div class="col-span-full py-4 text-center text-xs text-slate-400">
@@ -1021,6 +1061,6 @@
     </div>
 
     <!-- Application Script (Cache-busted) -->
-    <script src="app.js?v=20261023_box_junk_defects"></script>
+    <script src="app.js?v=20261023_main_flea_keyword"></script>
 </body>
 </html>

@@ -209,5 +209,33 @@ class TestAppEndpoints(unittest.TestCase):
         categories = [d["category"] for d in res_dmg["defects"]]
         self.assertIn("damage", categories)
 
+    def test_12_main_flea_keyword_extraction(self):
+        from backend.scraper import extract_main_flea_keyword
+        
+        # Test 1: Model number with brand and noise
+        k1 = extract_main_flea_keyword("★極美品★ SONY ソニー ワイヤレスノイズキャンセリングヘッドホン WH-1000XM4 ブラック 動作確認済 即決")
+        self.assertIn("WH-1000XM4", k1)
+        self.assertNotIn("★", k1)
+        self.assertNotIn("極美品", k1)
+        self.assertNotIn("即決", k1)
+        
+        # Test 2: Console with model
+        k2 = extract_main_flea_keyword("【動作良好】PS4 Pro 1TB CUH-7200B ジェットブラック 本体 送料無料")
+        self.assertIn("CUH-7200B", k2)
+        self.assertNotIn("送料無料", k2)
+        self.assertNotIn("動作良好", k2)
+        
+        # Test 3: Nintendo Switch OLED
+        k3 = extract_main_flea_keyword("【美品】Nintendo Switch 有機ELモデル ホワイト 本体 箱付き 動作確認済み 送料無料")
+        self.assertIn("Nintendo", k3)
+        self.assertIn("Switch", k3)
+        self.assertNotIn("美品", k3)
+        self.assertNotIn("送料無料", k3)
+        
+        # Test 4: Laptop model
+        k4 = extract_main_flea_keyword("DELL Vostro 3580 Core i5 8GB SSD 256GB 15.6インチ 動作品")
+        self.assertIn("3580", k4)
+        self.assertNotIn("動作品", k4)
+
 if __name__ == "__main__":
     unittest.main()

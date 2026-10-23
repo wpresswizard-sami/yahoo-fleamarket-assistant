@@ -1102,6 +1102,9 @@ function renderSearchResults(items, query) {
                 ${item.title}
             </div>
             ${defectRowHtml}
+            <div class="text-[9px] font-bold text-amber-900 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 mt-1 truncate" title="Flea Search Keyword: ${cleanTitle}">
+                🎯 Flea: ${cleanTitle}
+            </div>
             <div class="space-y-1 pt-1 border-t border-slate-100 text-[10px] mt-1">
                 <div class="flex justify-between items-center text-slate-500">
                     <span>🛒 Bid / Buy:</span>
@@ -1231,25 +1234,148 @@ async function scrapeAuctionById(auctionId, isSilent = false) {
     }
 }
 
-// Clean noisy auction bracket spam while PRESERVING the full exact product title & model numbers (Never truncate!)
+// Extract concise, high-signal Main Keywords (Model + Brand) for Flea Market searches
 function getCleanFleaMarketQuery(title) {
     if (!title) return "";
     let clean = title;
-    // Remove decorative bracket contents like 【送料無料】, 【極美品】, 【ジャンク】, 『...』
+    // 1. Remove bracketed noise
     clean = clean.replace(/【[^】]*】/g, ' ');
     clean = clean.replace(/『[^』]*』/g, ' ');
     clean = clean.replace(/「[^」]*」/g, ' ');
     clean = clean.replace(/\[[^\]]*\]/g, ' ');
-    // Remove auction spam symbols
-    clean = clean.replace(/[☆★◆◇■□▲△▼▽◎○※・！!？?♪～~_、]/g, ' ');
-    // Remove auction start price words (e.g. 1円開始, 1円スタート, 100円スタート, 1円〜)
-    clean = clean.replace(/[0-9]+円開始|[0-9]+円スタート|[0-9]+円〜?/g, ' ');
-    // Remove standalone auction hype adjectives
-    clean = clean.replace(/(極美品|超美品|美品|新品|未使用品|未使用|ジャンク品|ジャンク|完品|動作品|動作確認済|送料無料|即決|正規品|未開封|仕様不明|欠品|おまけ|格安|激安|1円)/g, ' ');
-    // Normalize spaces
-    clean = clean.replace(/\s+/g, ' ').trim();
-    // Return full cleaned title without truncating keywords
-    return clean || title.trim();
+    clean = clean.replace(/\([^\)]*\)/g, ' ');
+    clean = clean.replace(/（[^）]*）/g, ' ');
+    clean = clean.replace(/《[^》]*》/g, ' ');
+    // 2. Remove symbols and decorators
+    clean = clean.replace(/[☆★◆◇■□▲△▼▽◎○※・！!？?♪～~_、|/&+\\•#]/g, ' ');
+    // 3. Remove auction prices & 1-yen phrases
+    clean = clean.replace(/[0-9]+円開始|[0-9]+円スタート|[0-9]+円〜?|1円〜?|1円/g, ' ');
+    // 4. Remove auction spam & condition noise
+    const noiseRegex = /(極美品|超美品|美品|良品|極上品|綺麗|新品|未使用品|未使用|未開封|中古品|中古|動作品|動作確認済み|動作確認済|動作良好|完動品|稼働品|通電確認済み|通電確認済|通電のみ|動作未確認|仕様不明|ジャンク品|ジャンク|JUNK|junk|故障品|不動品|部品取り|修理前提|現状品|送料無料|送料込|即決|早い者勝ち|正規品|限定品|限定|セール|大人気|人気|格安|激安|まとめ売り|まとめ|セット|一式|おまけ付き|おまけ|お買い得|注目|希少|レア|当時物|レトロ|箱付き|元箱|外箱|箱あり|箱なし|本体のみ|本体|付属品多数|付属品完備|欠品あり|欠品|専用|対応|純正|レンズキット|ボディ|トリプルブラック|ジェットブラック|スペースグレイ|ホワイト|ブラック|シルバー|ゴールド)/gi;
+    clean = clean.replace(noiseRegex, ' ');
+    // 5. Remove standalone specs
+    clean = clean.replace(/\b[0-9]+(?:GB|TB|MB)\b|\b[0-9]+(?:\.[0-9]+)?インチ\b|第[0-9]+世代/gi, ' ');
+    // 6. Remove generic long category descriptors
+    const catRegex = /(ワイヤレスノイズキャンセリングヘッドホン|ノイズキャンセリングヘッドホン|ワイヤレスヘッドホン|ヘッドホン|イヤホン|ブルーレイレコーダー|DVDレコーダー|レコーダー|DJコントローラー|コントローラー|Controller|リモコン|Remote|ノートパソコン|パソコン|Amplifier|Unit|アンプ)/gi;
+    clean = clean.replace(catRegex, ' ');
+
+    const rawWords = clean.split(/\s+/).map(w => w.trim()).filter(w => w.length > 1);
+    if (rawWords.length === 0) return title.trim();
+
+    // Deduplicate bilingual brands
+    const brandPairs = [
+        ['SONY', 'ソニー'], ['Canon', 'キャノン'], ['Canon', 'キヤノン'],
+        ['Panasonic', 'パナソニック'], ['Pioneer', 'パイオニア'],
+        ['Nintendo', '任天堂'], ['Apple', 'アップル'], ['Bose', 'ボーズ'],
+        ['Dell', 'デル'], ['HP', 'ヒューレットパッカード'], ['Lenovo', 'レノボ']
+    ];
+    const words = [];
+    const seenBrands = new Set();
+    for (const w of rawWords) {
+        let skip = false;
+        for (const [eng, jpn] of brandPairs) {
+            if (w.toLowerCase() === eng.toLowerCase() || w === jpn) {
+                const key = `${eng}_${jpn}`;
+                if (seenBrands.has(key)) {
+                    skip = true;
+                } else {
+                    seenBrands.add(key);
+                }
+            }
+        }
+        if (!skip) words.push(w);
+    }
+
+    // Search for hyphenated model code first (BP-500DX2, CUH-7200B, WH-1000XM4, DMR-BRW1020, DDJ-400)
+    const hyphenModelRegex = /^[A-Za-z0-9]+[-_][A-Za-z0-9]+$/;
+    let modelIdx = -1;
+    for (let i = 0; i < words.length; i++) {
+        if (hyphenModelRegex.test(words[i])) {
+            modelIdx = i;
+            break;
+        }
+    }
+
+    // Other alphanumeric model codes
+    if (modelIdx === -1) {
+        const otherModelRegex = /^(?:[0-9]{3,4}[A-Za-z]?|[A-Z][0-9]|[A-Z]+[0-9]+)$/;
+        for (let i = 0; i < words.length; i++) {
+            const up = words[i].toUpperCase();
+            if (up === 'PS4' || up === 'PS5' || up === 'PS3' || up === 'PS2') continue;
+            if (otherModelRegex.test(words[i])) {
+                modelIdx = i;
+                break;
+            }
+        }
+    }
+
+    if (modelIdx !== -1) {
+        const startIdx = Math.max(0, modelIdx - 2);
+        let endIdx = modelIdx + 1;
+        if (endIdx < words.length && ['X9', 'G9', 'M1', 'M2', 'Pro', 'Air'].includes(words[endIdx])) {
+            endIdx += 1;
+        }
+        return words.slice(startIdx, endIdx).join(' ');
+    }
+
+    return words.slice(0, 3).join(' ');
+}
+
+// User-Facing Flea Keyword Actions
+function searchFleaByKeyword() {
+    const input = document.getElementById("flea-keyword-input");
+    const val = input ? input.value.trim() : "";
+    if (!val) {
+        showToast("Please enter a keyword first");
+        return;
+    }
+    const url = `https://paypayfleamarket.yahoo.co.jp/search/${encodeURIComponent(val)}`;
+    window.open(url, "_blank");
+}
+
+function searchMercariByKeyword() {
+    const input = document.getElementById("flea-keyword-input");
+    const val = input ? input.value.trim() : "";
+    if (!val) {
+        showToast("Please enter a keyword first");
+        return;
+    }
+    const url = `https://jp.mercari.com/search?keyword=${encodeURIComponent(val)}&status=sold_out`;
+    window.open(url, "_blank");
+}
+
+async function reloadLiveFleaSoldWithCurrentKeyword() {
+    const input = document.getElementById("flea-keyword-input");
+    const val = input ? input.value.trim() : "";
+    if (!val) return;
+    const grid = document.getElementById("live-flea-sold-grid");
+    if (grid) {
+        grid.innerHTML = `<div class="col-span-full py-4 text-center text-xs text-amber-600 animate-pulse font-bold">Searching Flea Market for "${val}"...</div>`;
+    }
+    try {
+        const res = await fetch(`/api/flea-sold?query=${encodeURIComponent(val)}`);
+        const data = await res.json();
+        const items = data.items || [];
+        if (items.length > 0) {
+            renderFleaSoldCards(grid, items);
+            showToast(`Found ${items.length} verified sold ads for "${val}"!`);
+        } else {
+            grid.innerHTML = `<div class="col-span-full py-3 text-center text-xs text-slate-500 bg-slate-50 rounded-lg border border-slate-200">No sold ads found for "${val}". Try a broader keyword.</div>`;
+        }
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+function copyFleaKeyword() {
+    const input = document.getElementById("flea-keyword-input");
+    const val = input ? input.value.trim() : "";
+    if (!val) return;
+    navigator.clipboard.writeText(val).then(() => {
+        showToast(`Copied keyword: "${val}"`);
+    }).catch(() => {
+        showToast(`Copied: ${val}`);
+    });
 }
 
 function reMatchSpec(word) {
@@ -1473,8 +1599,15 @@ function populateScrapedData(data) {
         .catch(() => {});
     }
 
+    // Set Flea Market Main Keyword input and reload sold
+    const cleanSearchTitle = data.flea_query || getCleanFleaMarketQuery(data.title);
+    const fleaInput = document.getElementById("flea-keyword-input");
+    if (fleaInput) {
+        fleaInput.value = cleanSearchTitle;
+    }
+
     // Fetch and display Live Verified Completed Sales from Yahoo Flea Market
-    loadLiveFleaSold(data.title, data.live_flea_sold);
+    loadLiveFleaSold(cleanSearchTitle, data.live_flea_sold);
 
     // Update JUNK Warning Alert
     const junkAlert = document.getElementById("top-junk-alert");
@@ -2436,3 +2569,7 @@ window.loadSuggestedProduct = loadSuggestedProduct;
 window.loadSuggestions = loadSuggestions;
 window.updateSellabilityCard = updateSellabilityCard;
 window.toggleBoxPricing = toggleBoxPricing;
+window.searchFleaByKeyword = searchFleaByKeyword;
+window.searchMercariByKeyword = searchMercariByKeyword;
+window.reloadLiveFleaSoldWithCurrentKeyword = reloadLiveFleaSoldWithCurrentKeyword;
+window.copyFleaKeyword = copyFleaKeyword;

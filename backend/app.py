@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 
-from backend.scraper import scrape_yahoo_auction, normalize_auction_url, search_yahoo_auctions, fetch_paypay_live_sold
+from backend.scraper import scrape_yahoo_auction, normalize_auction_url, search_yahoo_auctions, fetch_paypay_live_sold, extract_main_flea_keyword
 from backend.calculator import calculate_profit, suggest_prices, SHIPPING_METHODS, PLATFORM_FEES
 from backend.templates_engine import (
     generate_flea_description,
@@ -280,9 +280,11 @@ def api_get_flea_sold(query: str, limit: Optional[int] = 6):
     q = query.strip()
     if not q:
         return {"query": "", "items": []}
-    items = fetch_paypay_live_sold(q, limit=limit or 6)
+    clean_q = extract_main_flea_keyword(q) or q
+    items = fetch_paypay_live_sold(clean_q, limit=limit or 6)
     return {
         "query": q,
+        "clean_query": clean_q,
         "count": len(items),
         "items": items
     }

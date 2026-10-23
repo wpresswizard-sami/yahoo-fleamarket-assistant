@@ -33,6 +33,99 @@ def normalize_auction_url(input_str: str) -> str:
         return input_str
     return f"https://page.auctions.yahoo.co.jp/jp/auction/{input_str}"
 
+def extract_main_flea_keyword(title: str) -> str:
+    """
+    Extracts the high-signal core model, brand, and main product keyword from a bloated
+    Yahoo! Auction title, stripping auction noise, emojis, spam brackets, and filler words
+    so that PayPay Flea Market and Mercari return maximum matching results.
+    """
+    if not title:
+        return ""
+    clean = title
+    # 1. Remove bracketed noise
+    clean = re.sub(r'【[^】]*】|『[^』]*』|「[^」]*」|\[[^\]]*\]|\([^\)]*\)|（[^）]*）|《[^》]*》', ' ', clean)
+    # 2. Remove symbols and decorators
+    clean = re.sub(r'[☆★◆◇■□▲△▼▽◎○※・！!？?♪～~_、|/&+\\•#]', ' ', clean)
+    # 3. Remove auction prices & 1-yen phrases
+    clean = re.sub(r'[0-9]+円開始|[0-9]+円スタート|[0-9]+円〜?|1円〜?|1円', ' ', clean)
+    # 4. Remove auction spam & condition noise
+    noise_patterns = [
+        r'極美品|超美品|美品|良品|極上品|綺麗|新品|未使用品|未使用|未開封|中古品|中古',
+        r'動作品|動作確認済み|動作確認済|動作良好|完動品|稼働品|通電確認済み|通電確認済|通電のみ|動作未確認|仕様不明',
+        r'ジャンク品|ジャンク|JUNK|junk|故障品|不動品|部品取り|修理前提|現状品',
+        r'送料無料|送料込|即決|早い者勝ち|正規品|限定品|限定|セール|大人気|人気|格安|激安',
+        r'まとめ売り|まとめ|セット|一式|おまけ付き|おまけ|お買い得|注目|希少|レア|当時物|レトロ',
+        r'箱付き|元箱|外箱|箱あり|箱なし|本体のみ|本体|付属品多数|付属品完備|欠品あり|欠品|専用|対応|純正',
+        r'レンズキット|ボディ|トリプルブラック|ジェットブラック|スペースグレイ|ホワイト|ブラック|シルバー|ゴールド'
+    ]
+    for np in noise_patterns:
+        clean = re.sub(np, ' ', clean, flags=re.IGNORECASE)
+    # 5. Remove standalone specs
+    clean = re.sub(r'\b[0-9]+(?:GB|TB|MB)\b|\b[0-9]+(?:\.[0-9]+)?インチ\b|第[0-9]+世代', ' ', clean, flags=re.IGNORECASE)
+    # 6. Remove generic long category descriptors
+    category_noise = [
+        r'ワイヤレスノイズキャンセリングヘッドホン|ノイズキャンセリングヘッドホン|ワイヤレスヘッドホン|ヘッドホン|イヤホン',
+        r'ブルーレイレコーダー|DVDレコーダー|レコーダー',
+        r'DJコントローラー|コントローラー|Controller|リモコン|Remote',
+        r'ノートパソコン|パソコン|Amplifier|Unit|アンプ'
+    ]
+    for cn in category_noise:
+        clean = re.sub(cn, ' ', clean, flags=re.IGNORECASE)
+
+    raw_words = [w.strip() for w in clean.split() if len(w.strip()) > 1]
+    if not raw_words:
+        return title.strip()
+
+    # Deduplicate bilingual brands: if both 'SONY' and 'ソニー' exist, keep only 'SONY'
+    brand_pairs = [
+        ('SONY', 'ソニー'), ('Canon', 'キャノン'), ('Canon', 'キヤノン'),
+        ('Panasonic', 'パナソニック'), ('Pioneer', 'パイオニア'),
+        ('Nintendo', '任天堂'), ('Apple', 'アップル'), ('Bose', 'ボーズ'),
+        ('Dell', 'デル'), ('HP', 'ヒューレットパッカード'), ('Lenovo', 'レノボ')
+    ]
+    words = []
+    seen_pair_brands = set()
+    for w in raw_words:
+        skip = False
+        for eng, jpn in brand_pairs:
+            if w.lower() == eng.lower() or w == jpn:
+                if (eng, jpn) in seen_pair_brands:
+                    skip = True
+                else:
+                    seen_pair_brands.add((eng, jpn))
+        if not skip:
+            words.append(w)
+
+    # Search for hyphenated model codes first (most specific: BP-500DX2, CUH-7200B, WH-1000XM4, DMR-BRW1020, DDJ-400)
+    hyphen_model_regex = re.compile(r'^[A-Za-z0-9]+[-_][A-Za-z0-9]+$')
+    model_idx = -1
+    for idx, w in enumerate(words):
+        if hyphen_model_regex.match(w):
+            model_idx = idx
+            break
+
+    # If no hyphenated model, check for numeric or alphanumeric model (e.g. 3580, 450, M1, X9, QC45)
+    if model_idx == -1:
+        other_model_regex = re.compile(r'^[0-9]{3,4}[A-Za-z]?$|^[A-Z][0-9]$|^[A-Z]+[0-9]+$')
+        for idx, w in enumerate(words):
+            if w.upper() in ['PS4', 'PS5', 'PS3', 'PS2']:
+                continue
+            if other_model_regex.match(w):
+                model_idx = idx
+                break
+
+    # If a model code was found: keep preceding brand/noun + model
+    if model_idx != -1:
+        start_idx = max(0, model_idx - 2)
+        end_idx = model_idx + 1
+        if end_idx < len(words) and words[end_idx] in ['X9', 'G9', 'M1', 'M2', 'Pro', 'Air']:
+            end_idx += 1
+        selected = words[start_idx:end_idx]
+        return ' '.join(selected)
+
+    # Fallback: top 2-3 informative words
+    return ' '.join(words[:3])
+
 def analyze_condition_and_defects(title: str, description: str = "", condition_str: str = "") -> Dict[str, Any]:
     """
     Intelligently analyzes Yahoo Auction title, description & condition for:
@@ -411,6 +504,7 @@ def scrape_yahoo_auction(url_or_id: str) -> Dict[str, Any]:
             "condition_analysis": cond_analysis,
             "has_box": cond_analysis["box"]["has_box"],
             "box_badge": cond_analysis["box"]["badge_text"],
+            "flea_query": extract_main_flea_keyword(title),
             "box_impact": cond_analysis["box"]["impact"],
             "is_junk": cond_analysis["junk"]["is_junk"],
             "junk_reasons": cond_analysis["junk"]["reasons"],
@@ -594,6 +688,7 @@ def search_yahoo_auctions(query: str, limit: int = 12, sort: str = "default") ->
                 "is_junk": cond_meta["junk"]["is_junk"],
                 "junk_reasons": cond_meta["junk"]["reasons"],
                 "has_damage": cond_meta["has_damage"],
+                "flea_query": extract_main_flea_keyword(it.get("title", "")),
                 "defect_summary": cond_meta["defect_summary"],
                 "bids": bids_count,
                 "remaining_time": rem_time_str,
@@ -616,12 +711,10 @@ def fetch_paypay_live_sold(query_or_title: str, limit: int = 6) -> List[Dict[str
     if not query_or_title:
         return []
 
-    # Clean auction noise while preserving the full exact title & model numbers (never truncate!)
-    clean = re.sub(r'【[^】]*】|『[^』]*』|「[^」]*」|\[[^\]]*\]|[☆★◆◇■□▲△▼▽◎○※・！!？?♪～~_、,]', ' ', query_or_title)
-    clean = re.sub(r'[0-9]+円開始|[0-9]+円スタート|[0-9]+円〜?', ' ', clean)
-    clean = re.sub(r'(極美品|超美品|美品|新品|未使用品|未使用|ジャンク品|ジャンク|完品|動作品|動作確認済|送料無料|即決|正規品|未開封|仕様不明|欠品|おまけ|格安|激安|1円)', ' ', clean)
-    clean = re.sub(r'\s+', ' ', clean).strip()
-    clean_q = clean if clean else query_or_title.strip()
+    # Extract concise main keyword so Flea Market returns maximum relevant results
+    clean_q = extract_main_flea_keyword(query_or_title)
+    if not clean_q:
+        clean_q = query_or_title.strip()
     
     clean_q_for_url = clean_q.replace('&', ' ').replace('/', ' ')
     clean_q_for_url = re.sub(r'\s+', ' ', clean_q_for_url).strip()
