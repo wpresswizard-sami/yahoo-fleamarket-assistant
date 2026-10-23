@@ -61,13 +61,15 @@ def scrape_yahoo_auction(url_or_id: str) -> Dict[str, Any]:
         html = response.text
         soup = BeautifulSoup(html, "html.parser")
         
-        # Parse __NEXT_DATA__ for rich auction info (time, bids, leftTime)
+        # Parse __NEXT_DATA__ for rich auction info (time, bids, leftTime, shipping)
         item_detail = {}
         next_data_match = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', html, re.DOTALL)
         if next_data_match:
             try:
                 page_json = json.loads(next_data_match.group(1))
-                item_detail = page_json.get("props", {}).get("pageProps", {}).get("initialState", {}).get("item", {}).get("detail", {}).get("item", {})
+                props = page_json.get("props", {}).get("pageProps", {})
+                item_wrap = props.get("initialState", {}).get("item", {}) or props.get("item", {})
+                item_detail = item_wrap.get("detail", {}).get("item", {}) if isinstance(item_wrap, dict) else {}
             except Exception:
                 item_detail = {}
         
@@ -169,22 +171,48 @@ def scrape_yahoo_auction(url_or_id: str) -> Dict[str, Any]:
             if found_condition:
                 break
 
-        # Extract shipping conditions (送料負担)
+        # Extract shipping conditions (送料負担 & 送料金額)
         shipping_buyer_pays = True
         estimated_inbound_shipping = 0
-        if "送料無料" in html or "出品者負担" in html or "出品者が負担" in html:
+        shipping_text = "落札者負担"
+        shipping_method_name = ""
+
+        charge_for_shipping = item_detail.get("chargeForShipping") if isinstance(item_detail, dict) else ""
+        if charge_for_shipping == "seller" or "送料無料" in html or "出品者負担" in html or "出品者が負担" in html:
             shipping_buyer_pays = False
-            shipping_text = "出品者負担 (無料 / 込み)"
+            shipping_text = "出品者負担 (送料無料)"
             estimated_inbound_shipping = 0
         else:
-            shipping_text = "落札者負担"
-            # Try to extract shipping fee if mentioned like '750円' or '210円'
-            ship_match = re.search(r'送料\s*[:：]?\s*([0-9]{1,3}(?:,[0-9]{3})*)\s*円', html)
-            if ship_match:
-                try:
-                    estimated_inbound_shipping = int(ship_match.group(1).replace(",", ""))
-                except Exception:
-                    estimated_inbound_shipping = 0
+            shipping_buyer_pays = True
+            # Extract shipping fee from structured Next.js methods
+            shipping_info = item_detail.get("shipping", {}) if isinstance(item_detail, dict) else {}
+            methods = shipping_info.get("methods", []) if isinstance(shipping_info, dict) else []
+            fees = []
+            for m in methods:
+                fee = m.get("shippingFee")
+                if fee is not None:
+                    try:
+                        fees.append(int(fee))
+                        if not shipping_method_name:
+                            shipping_method_name = m.get("name", "")
+                    except Exception:
+                        pass
+            if fees:
+                estimated_inbound_shipping = min(fees)
+            
+            # Fallback regex if structured method fee was not found
+            if estimated_inbound_shipping == 0:
+                ship_match = re.search(r'送料[^\d]{0,35}([0-9]{1,3}(?:,[0-9]{3})*)\s*円', html)
+                if ship_match:
+                    try:
+                        estimated_inbound_shipping = int(ship_match.group(1).replace(",", ""))
+                    except Exception:
+                        estimated_inbound_shipping = 0
+
+            if estimated_inbound_shipping > 0:
+                shipping_text = f"落札者負担 (+¥{estimated_inbound_shipping:,})"
+            else:
+                shipping_text = "落札者負担 (送料別)"
 
         # Extract all high-res images
         images = []
@@ -279,6 +307,9 @@ def scrape_yahoo_auction(url_or_id: str) -> Dict[str, Any]:
             "shipping_buyer_pays": shipping_buyer_pays,
             "shipping_text": shipping_text,
             "estimated_inbound_shipping": estimated_inbound_shipping,
+            "shipping_method_name": shipping_method_name,
+            "total_procurement": buy_price + estimated_inbound_shipping,
+            "is_free_shipping": not shipping_buyer_pays,
             "images": images,
             "seller_id": seller_id,
             "seller_rating": seller_rating,
@@ -383,31 +414,55 @@ def search_yahoo_auctions(query: str, limit: int = 12, sort: str = "default") ->
             is_fixed = bool(it.get("isFixedPrice"))
             is_ending_soon = bool(left_sec is not None and 0 < left_sec < 7200)
 
-            # Projected selling price (Hardware spec-aware estimation)
+            # Inbound shipping extraction (Accurately detect Yahoo Auction shipping traps!)
+            is_free_shipping = bool(it.get("isFreeShipping"))
+            shipping_fee = 0
+            if not is_free_shipping:
+                if it.get("currentPriceShippingFee") is not None:
+                    try:
+                        shipping_fee = int(it.get("currentPriceShippingFee") or 0)
+                    except Exception:
+                        shipping_fee = 0
+                elif it.get("buyNowPriceShippingFee") is not None:
+                    try:
+                        shipping_fee = int(it.get("buyNowPriceShippingFee") or 0)
+                    except Exception:
+                        shipping_fee = 0
+                elif it.get("shippingFee") is not None:
+                    try:
+                        shipping_fee = int(it.get("shippingFee") or 0)
+                    except Exception:
+                        shipping_fee = 0
+
+            total_procurement = price + shipping_fee
+
+            # Projected selling price (Hardware spec-aware estimation based on total buy cost)
             try:
                 from backend.market_radar import estimate_real_flea_price
-                market_est = estimate_real_flea_price(it.get("title", ""), price)
+                market_est = estimate_real_flea_price(it.get("title", ""), total_procurement)
                 if market_est.get("is_custom_spec"):
                     target_sell = market_est["sweet_spot"]
                 else:
-                    target_sell = round((price + 500) * 1.35)
+                    target_sell = round((total_procurement + 500) * 1.35)
             except Exception:
-                target_sell = round((price + 500) * 1.35)
+                target_sell = round((total_procurement + 500) * 1.35)
 
-            if target_sell < 1000 and price > 0:
-                target_sell = price + 500
+            if target_sell < 1000 and total_procurement > 0:
+                target_sell = total_procurement + 500
             fee = round(target_sell * 0.05)
             t_low = (it.get("title", "") or "").lower()
             ship = 750 if any(k in t_low for k in ['laptop', 'ノートpc', 'ノートパソコン', 'パソコン', 'pc', '15.6', '13.3', '14.0']) else 210
-            net_profit = target_sell - price - fee - ship
+            net_profit = target_sell - total_procurement - fee - ship
 
             results.append({
                 "auction_id": auc_id,
                 "title": it.get("title", ""),
                 "buy_price": price,
+                "shipping_fee": shipping_fee,
+                "total_procurement": total_procurement,
                 "buy_now_price": int(it.get("buyNowPrice") or 0),
                 "image": clean_img,
-                "is_free_shipping": bool(it.get("isFreeShipping")),
+                "is_free_shipping": is_free_shipping,
                 "url": f"https://page.auctions.yahoo.co.jp/jp/auction/{auc_id}",
                 "target_sell_price": target_sell,
                 "estimated_profit": net_profit,

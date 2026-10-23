@@ -1022,7 +1022,13 @@ function renderSearchResults(items, query) {
         const isSelected = item.auction_id === activeSearchAuctionId;
         card.id = `search-card-${item.auction_id}`;
         card.className = `cursor-pointer rounded-xl p-2.5 transition-all text-left border relative group bg-white hover:border-red-500 hover:shadow-md ${isSelected ? 'border-red-500 ring-2 ring-red-400/50 bg-red-50/20' : 'border-slate-200'}`;
-        card.onclick = () => scrapeAuctionById(item.auction_id);
+        card.onclick = () => {
+            const inShipEl = document.getElementById("calc-inbound-shipping");
+            if (inShipEl && item.shipping_fee !== undefined) {
+                inShipEl.value = item.shipping_fee;
+            }
+            scrapeAuctionById(item.auction_id);
+        };
 
         const imgUrl = item.image || "https://placehold.co/150x150?text=No+Photo";
         const profitColor = item.estimated_profit >= 0 ? "text-emerald-600" : "text-rose-600";
@@ -1045,11 +1051,18 @@ function renderSearchResults(items, query) {
                 <span>⏰ ${item.remaining_time}</span>
             </span>` : (item.is_fixed_price ? '<span class="absolute top-1 right-1 bg-blue-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-xs">⚡ Buy Now</span>' : '');
 
+        const shippingBadgeHtml = item.is_free_shipping ? 
+            '<span class="absolute bottom-1 right-1 bg-emerald-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-2xs">送料無料 (Free)</span>' : 
+            (item.shipping_fee > 0 ? 
+                `<span class="absolute bottom-1 right-1 bg-rose-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-2xs">送料 +¥${item.shipping_fee.toLocaleString()}</span>` : 
+                '<span class="absolute bottom-1 right-1 bg-slate-700/80 text-white text-[8px] font-medium px-1 py-0.5 rounded">送料別</span>'
+            );
+
         card.innerHTML = `
             <div class="relative w-full h-24 rounded-lg overflow-hidden bg-slate-100 mb-1.5 border border-slate-100">
                 <img src="${imgUrl}" alt="${item.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" onerror="this.src='https://placehold.co/150x150?text=No+Photo'">
                 <span class="absolute top-1 left-1 bg-black/70 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">#${idx+1}</span>
-                ${item.is_free_shipping ? '<span class="absolute bottom-1 right-1 bg-emerald-600 text-white text-[9px] font-bold px-1 py-0.5 rounded">Free Ship</span>' : ''}
+                ${shippingBadgeHtml}
                 ${sellBadge}
                 ${timeBadgeHtml}
             </div>
@@ -1070,9 +1083,24 @@ function renderSearchResults(items, query) {
             </div>
             <div class="space-y-1 pt-1 border-t border-slate-100 text-[10px]">
                 <div class="flex justify-between items-center text-slate-500">
-                    <span>🛒 Buy Price:</span>
+                    <span>🛒 Bid / Buy:</span>
                     <b class="text-blue-700 font-bold text-xs">¥${item.buy_price.toLocaleString()}</b>
                 </div>
+                <div class="flex justify-between items-center text-slate-500">
+                    <span>🚚 Inbound Ship:</span>
+                    ${item.is_free_shipping ? 
+                        '<span class="text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded font-bold text-[9px] border border-emerald-200">送料無料 (Free)</span>' : 
+                        (item.shipping_fee > 0 ? 
+                            `<span class="text-rose-700 bg-rose-50 px-1.5 py-0.2 rounded font-black text-[9px] border border-rose-200">+¥${item.shipping_fee.toLocaleString()}</span>` : 
+                            '<span class="text-slate-500 text-[9px]">送料別</span>'
+                        )
+                    }
+                </div>
+                ${item.shipping_fee > 0 ? `
+                <div class="flex justify-between items-center text-slate-800 bg-slate-100/90 px-1.5 py-0.5 rounded font-bold text-[10px] border border-slate-200">
+                    <span class="text-slate-600">💰 Total Buy Cost:</span>
+                    <b class="text-slate-950 font-black">¥${(item.buy_price + item.shipping_fee).toLocaleString()}</b>
+                </div>` : ''}
                 <div class="flex justify-between items-center text-slate-500">
                     <span>🏷️ Flea Target:</span>
                     <b class="text-amber-700 font-bold">¥${item.target_sell_price.toLocaleString()}</b>
@@ -1731,10 +1759,24 @@ async function runLiveCalculation() {
         if (bannerBuy) bannerBuy.innerText = `¥${buyPrice.toLocaleString()}`;
 
         const bannerInShip = document.getElementById("banner-inbound-ship");
-        if (bannerInShip) bannerInShip.innerText = `(+¥${inboundShipping.toLocaleString()} ship)`;
+        if (bannerInShip) {
+            if (inboundShipping > 0) {
+                bannerInShip.innerText = `+¥${inboundShipping.toLocaleString()} 送料 (Ship)`;
+                bannerInShip.className = "text-xs font-black text-rose-300 bg-rose-950/80 px-2 py-0.5 rounded-md border border-rose-700/80";
+            } else {
+                bannerInShip.innerText = `送料無料 (Free Ship)`;
+                bannerInShip.className = "text-xs font-bold text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded-md border border-emerald-700/80";
+            }
+        }
 
         const bannerTotalCost = document.getElementById("banner-total-cost");
-        if (bannerTotalCost) bannerTotalCost.innerText = `¥${calc.procurement_cost.toLocaleString()}`;
+        if (bannerTotalCost) {
+            if (inboundShipping > 0) {
+                bannerTotalCost.innerHTML = `¥${calc.procurement_cost.toLocaleString()} <span class="text-[10px] text-slate-400 font-normal">(¥${buyPrice.toLocaleString()} + ¥${inboundShipping.toLocaleString()} ship)</span>`;
+            } else {
+                bannerTotalCost.innerText = `¥${calc.procurement_cost.toLocaleString()}`;
+            }
+        }
 
         const bannerSell = document.getElementById("banner-sell-price");
         if (bannerSell) bannerSell.innerText = `¥${sellPrice.toLocaleString()}`;

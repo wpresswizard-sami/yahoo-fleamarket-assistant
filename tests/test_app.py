@@ -137,5 +137,25 @@ class TestAppEndpoints(unittest.TestCase):
         self.assertIn("items", data)
         self.assertIn("count", data)
 
+    def test_09_shipping_trap_protection(self):
+        # Test 11 yen buy price with 1500 yen inbound shipping
+        res = client.post("/api/calculate", json={
+            "buy_price": 11,
+            "inbound_shipping": 1500,
+            "sell_price": 1120,
+            "shipping_out": 210,
+            "packaging_cost": 0,
+            "platform": "yahoo_flea"
+        })
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        calc = data["calc"]
+        self.assertEqual(calc["buy_price"], 11)
+        self.assertEqual(calc["inbound_shipping"], 1500)
+        self.assertEqual(calc["procurement_cost"], 1511)
+        # 1120 - 1511 - 56 (5% fee) - 210 = -657 (Loss!)
+        self.assertEqual(calc["net_profit"], -657)
+        self.assertFalse(calc["is_profitable"])
+
 if __name__ == "__main__":
     unittest.main()
