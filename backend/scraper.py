@@ -491,6 +491,13 @@ def scrape_yahoo_auction(url_or_id: str) -> Dict[str, Any]:
 
         # Deep Condition, Box, Junk & Defect Analysis
         cond_analysis = analyze_condition_and_defects(title=title, description=description, condition_str=condition)
+        
+        # Real Flea Market 2-3 page sold average
+        try:
+            from backend.market_radar import get_flea_market_real_sold_stats
+            flea_stats = get_flea_market_real_sold_stats(title, max_pages=2)
+        except Exception:
+            flea_stats = None
 
         return {
             "success": True,
@@ -506,6 +513,8 @@ def scrape_yahoo_auction(url_or_id: str) -> Dict[str, Any]:
             "box_badge": cond_analysis["box"]["badge_text"],
             "flea_query": extract_main_flea_keyword(title),
             "box_impact": cond_analysis["box"]["impact"],
+            "flea_stats": flea_stats,
+            "target_sell_price": (flea_stats.get("avg_sold_price") if flea_stats and flea_stats.get("avg_sold_price", 0) > 0 else 0),
             "is_junk": cond_analysis["junk"]["is_junk"],
             "junk_reasons": cond_analysis["junk"]["reasons"],
             "defects": cond_analysis["defects"],
@@ -645,31 +654,42 @@ def search_yahoo_auctions(query: str, limit: int = 12, sort: str = "default") ->
             # Condition, Box, Junk & Defect quick analysis for search card
             cond_meta = analyze_condition_and_defects(title=it.get("title", ""))
 
-            # Projected selling price (Hardware spec-aware estimation based on total buy cost & box status)
+            # Real Flea Market 2-3 page sold average calculation
             try:
-                from backend.market_radar import estimate_real_flea_price
-                market_est = estimate_real_flea_price(it.get("title", ""), total_procurement)
-                if market_est.get("is_custom_spec"):
-                    target_sell = market_est["sweet_spot"]
+                from backend.market_radar import get_flea_market_real_sold_stats, estimate_real_flea_price
+                flea_stats = get_flea_market_real_sold_stats(it.get("title", ""), max_pages=2)
+                if flea_stats.get("success") and flea_stats.get("avg_sold_price", 0) > 0:
+                    target_sell = flea_stats["avg_sold_price"]
+                    flea_sample_count = flea_stats.get("sample_count", 0)
+                    flea_min = flea_stats.get("min_sold_price", 0)
+                    flea_max = flea_stats.get("max_sold_price", 0)
                 else:
-                    target_sell = round((total_procurement + 500) * 1.35)
+                    market_est = estimate_real_flea_price(it.get("title", ""), total_procurement)
+                    target_sell = market_est["sweet_spot"]
+                    flea_sample_count = market_est.get("sample_count", 0)
+                    flea_min = market_est.get("min_sold", 0)
+                    flea_max = market_est.get("max_sold", 0)
             except Exception:
-                target_sell = round((total_procurement + 500) * 1.35)
+                target_sell = round((total_procurement + 500) * 1.20)
+                flea_sample_count = 0
+                flea_min = 0
+                flea_max = 0
 
             # Adjust sell price based on box presence or junk status
             if cond_meta["junk"]["is_junk"]:
-                target_sell = max(round(total_procurement * 1.15), total_procurement + 300)
+                target_sell = max(round(target_sell * 0.70), 500)
             elif cond_meta["box"]["has_box"] is True:
-                target_sell = round(target_sell * 1.15)  # Box premium
+                target_sell = round(target_sell * 1.05)
             elif cond_meta["box"]["has_box"] is False:
-                target_sell = max(round(target_sell * 0.90), total_procurement + 300)  # Unit only
+                target_sell = round(target_sell * 0.95)
 
             if target_sell < 1000 and total_procurement > 0:
                 target_sell = total_procurement + 500
             fee = round(target_sell * 0.05)
             t_low = (it.get("title", "") or "").lower()
-            ship = 750 if any(k in t_low for k in ['laptop', 'ノートpc', 'ノートパソコン', 'パソコン', 'pc', '15.6', '13.3', '14.0']) else 210
+            ship = 750 if any(k in t_low for k in ['laptop', 'ノートpc', 'ノートパソコン', 'パソコン', 'pc', '15.6', '13.3', '14.0', 'ps5', 'playstation 5', 'ps4']) else 210
             net_profit = target_sell - total_procurement - fee - ship
+            is_overpriced = bool(net_profit < 0)
 
             results.append({
                 "auction_id": auc_id,
@@ -683,6 +703,10 @@ def search_yahoo_auctions(query: str, limit: int = 12, sort: str = "default") ->
                 "url": f"https://page.auctions.yahoo.co.jp/jp/auction/{auc_id}",
                 "target_sell_price": target_sell,
                 "estimated_profit": net_profit,
+                "flea_sold_count": flea_sample_count,
+                "flea_min": flea_min,
+                "flea_max": flea_max,
+                "is_overpriced": is_overpriced,
                 "has_box": cond_meta["box"]["has_box"],
                 "box_badge": cond_meta["box"]["badge_text"],
                 "is_junk": cond_meta["junk"]["is_junk"],
@@ -721,7 +745,7 @@ def fetch_paypay_live_sold(query_or_title: str, limit: int = 6) -> List[Dict[str
     
     import urllib.parse
     encoded = urllib.parse.quote(clean_q_for_url)
-    url = f"https://paypayfleamarket.yahoo.co.jp/search/{encoded}"
+    url = f"https://paypayfleamarket.yahoo.co.jp/search/{encoded}?sold=1"
     
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",

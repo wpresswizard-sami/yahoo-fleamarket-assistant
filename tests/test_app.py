@@ -237,5 +237,23 @@ class TestAppEndpoints(unittest.TestCase):
         self.assertIn("3580", k4)
         self.assertNotIn("動作品", k4)
 
+    def test_13_real_flea_sold_average_stats(self):
+        from backend.market_radar import get_flea_market_real_sold_stats
+        
+        # Test 1: Real average of PS5 Digital Edition CFI-1200B
+        # User screenshot proves real average is ~44,600 (not 64,000)
+        stats = get_flea_market_real_sold_stats("プレイステーション5 デジタルエディション CFI-1200B", max_pages=2)
+        self.assertTrue(stats["success"])
+        self.assertGreater(stats["avg_sold_price"], 38000)
+        self.assertLess(stats["avg_sold_price"], 52000)
+        self.assertGreater(stats["sample_count"], 10)
+        
+        # Test 2: API flea-sold endpoint returns stats
+        res = client.get("/api/flea-sold?query=PS4+Pro+CUH-7200B")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertIn("stats", data)
+        self.assertGreater(data["stats"]["avg_sold_price"], 10000)
+
 if __name__ == "__main__":
     unittest.main()

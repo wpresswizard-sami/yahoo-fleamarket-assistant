@@ -378,6 +378,23 @@
                         </div>
                     </div>
 
+                    <!-- Real 2/3 Page Average Sold Price Banner -->
+                    <div id="flea-sold-avg-banner" class="hidden bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 p-3 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-xs">
+                        <div>
+                            <div class="flex items-center space-x-2 flex-wrap">
+                                <span class="text-[10px] uppercase tracking-wider font-black bg-amber-600 text-white px-2 py-0.5 rounded shadow-2xs">2/3 Page Sold Average</span>
+                                <b id="flea-stat-avg-price" class="text-lg font-black text-slate-900">¥--</b>
+                                <span id="flea-stat-count-badge" class="text-[10px] text-amber-900 bg-amber-200/80 px-2 py-0.5 rounded font-black border border-amber-300">80+ sold ads analyzed</span>
+                            </div>
+                            <p id="flea-stat-range-text" class="text-[11px] text-slate-600 mt-1 font-medium">
+                                Real average based on 2-3 pages of PayPay Flea Market completed sales
+                            </p>
+                        </div>
+                        <button type="button" id="btn-apply-flea-avg" onclick="applyRealFleaAveragePrice()" class="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black shadow-xs flex items-center space-x-1.5 transition flex-shrink-0 cursor-pointer" title="Apply this real market average to selling price">
+                            <span>⚡ Apply Real Avg (<span id="btn-avg-val">¥--</span>)</span>
+                        </button>
+                    </div>
+
                     <!-- Grid of real sold cards -->
                     <div id="live-flea-sold-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
                         <div class="col-span-full py-4 text-center text-xs text-slate-400">
@@ -1061,6 +1078,6 @@
     </div>
 
     <!-- Application Script (Cache-busted) -->
-    <script src="app.js?v=20261023_main_flea_keyword"></script>
+    <script src="app.js?v=20261023_real_flea_avg"></script>
 </body>
 </html>

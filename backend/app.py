@@ -279,12 +279,15 @@ def api_get_suggestions(category: Optional[str] = "all"):
 def api_get_flea_sold(query: str, limit: Optional[int] = 6):
     q = query.strip()
     if not q:
-        return {"query": "", "items": []}
+        return {"query": "", "items": [], "stats": {}}
+    from backend.market_radar import get_flea_market_real_sold_stats
     clean_q = extract_main_flea_keyword(q) or q
+    stats = get_flea_market_real_sold_stats(clean_q, max_pages=2)
     items = fetch_paypay_live_sold(clean_q, limit=limit or 6)
     return {
         "query": q,
         "clean_query": clean_q,
+        "stats": stats,
         "count": len(items),
         "items": items
     }

@@ -1126,13 +1126,30 @@ function renderSearchResults(items, query) {
                     <b class="text-slate-950 font-black">¥${totalBuyCost.toLocaleString()}</b>
                 </div>` : ''}
                 <div class="flex justify-between items-center text-slate-500">
-                    <span>🏷️ Flea Target:</span>
-                    <b class="text-amber-700 font-bold">¥${item.target_sell_price.toLocaleString()}</b>
+                    <span class="flex items-center space-x-1">
+                        <span>🏷️ Flea Target:</span>
+                    </span>
+                    <div class="text-right">
+                        <b class="text-slate-900 font-black text-xs">¥${item.target_sell_price.toLocaleString()}</b>
+                        ${item.flea_sold_count > 0 ? 
+                            `<span class="text-[9px] text-slate-500 block font-normal">(Avg of ${item.flea_sold_count} sold ads / 2-3 pages)</span>` : 
+                            ''
+                        }
+                    </div>
                 </div>
+                ${item.is_overpriced || item.estimated_profit < 0 ? `
+                <div class="flex justify-between items-center pt-0.5 border-t border-dashed border-rose-300 bg-rose-50 px-1.5 py-0.5 rounded text-rose-800">
+                    <span class="font-bold text-rose-700">⚠️ Overpriced (Loss):</span>
+                    <b class="font-black text-rose-600 text-xs">${profitBadge}</b>
+                </div>
+                <div class="text-[9px] font-black text-rose-700 bg-rose-100 px-1 py-0.5 rounded text-center border border-rose-300 mt-1">
+                    ⚠️ Yahoo bid is HIGHER than Flea Market sold average!
+                </div>` : `
                 <div class="flex justify-between items-center pt-0.5 border-t border-dashed border-slate-200">
                     <span class="font-bold text-slate-600">💰 Est Profit:</span>
                     <b class="font-black ${profitColor} text-xs">${profitBadge}</b>
-                </div>
+                </div>`
+                }
             </div>
 
             <!-- 60-Day Completed Sales & Turnaround Velocity -->
@@ -1356,6 +1373,9 @@ async function reloadLiveFleaSoldWithCurrentKeyword() {
         const res = await fetch(`/api/flea-sold?query=${encodeURIComponent(val)}`);
         const data = await res.json();
         const items = data.items || [];
+        if (data.stats) {
+            updateFleaSoldStatsBanner(data.stats);
+        }
         if (items.length > 0) {
             renderFleaSoldCards(grid, items);
             showToast(`Found ${items.length} verified sold ads for "${val}"!`);
@@ -1412,6 +1432,9 @@ async function loadLiveFleaSold(title, preloadedItems = null) {
         const res = await fetch(`/api/flea-sold?query=${encodeURIComponent(cleanTitle || title)}`);
         const data = await res.json();
         const items = data.items || [];
+        if (data.stats) {
+            updateFleaSoldStatsBanner(data.stats);
+        }
         renderFleaSoldCards(grid, items);
     } catch (e) {
         console.error("Error loading live flea sold:", e);
@@ -1575,7 +1598,10 @@ function populateScrapedData(data) {
     const inShipEl = document.getElementById("calc-inbound-shipping");
     if (inShipEl) inShipEl.value = data.estimated_inbound_shipping || 0;
 
-    let initSell = data.target_sell_price || Math.round(((data.buy_price || 0) + (data.estimated_inbound_shipping || 0) + 500) * 1.35);
+    let initSell = (data.flea_stats && data.flea_stats.avg_sold_price > 0) ? data.flea_stats.avg_sold_price : (data.target_sell_price || Math.round(((data.buy_price || 0) + (data.estimated_inbound_shipping || 0) + 500) * 1.25));
+    if (data.flea_stats) {
+        updateFleaSoldStatsBanner(data.flea_stats);
+    }
     if (initSell < 1000) initSell = 1200;
     const sellPriceEl = document.getElementById("calc-sell-price");
     if (sellPriceEl) sellPriceEl.value = initSell;
@@ -1651,6 +1677,42 @@ function populateScrapedData(data) {
     }
 
     runLiveCalculation();
+}
+
+let currentFleaAveragePrice = 0;
+
+function updateFleaSoldStatsBanner(stats) {
+    const banner = document.getElementById("flea-sold-avg-banner");
+    if (!banner || !stats || !stats.avg_sold_price) {
+        if (banner) banner.classList.add("hidden");
+        return;
+    }
+    currentFleaAveragePrice = stats.avg_sold_price;
+    const avgEl = document.getElementById("flea-stat-avg-price");
+    if (avgEl) avgEl.innerText = `¥${stats.avg_sold_price.toLocaleString()}`;
+
+    const countBadge = document.getElementById("flea-stat-count-badge");
+    if (countBadge) countBadge.innerText = `${stats.sample_count || 40}+ sold ads analyzed`;
+
+    const rangeText = document.getElementById("flea-stat-range-text");
+    if (rangeText) {
+        rangeText.innerText = `Range: ¥${(stats.min_sold_price || 0).toLocaleString()} ~ ¥${(stats.max_sold_price || 0).toLocaleString()} | Median: ¥${(stats.median_sold_price || stats.avg_sold_price).toLocaleString()} (Across 2-3 pages of PayPay Flea Market)`;
+    }
+
+    const btnVal = document.getElementById("btn-avg-val");
+    if (btnVal) btnVal.innerText = `¥${stats.avg_sold_price.toLocaleString()}`;
+
+    banner.classList.remove("hidden");
+}
+
+function applyRealFleaAveragePrice() {
+    if (!currentFleaAveragePrice || currentFleaAveragePrice <= 0) return;
+    const input = document.getElementById("calc-sell-price");
+    if (input) {
+        input.value = currentFleaAveragePrice;
+        runLiveCalculation();
+        showToast(`Applied 2/3 Page Real Sold Average: ¥${currentFleaAveragePrice.toLocaleString()}`);
+    }
 }
 
 let currentBoxState = null;
@@ -2573,3 +2635,4 @@ window.searchFleaByKeyword = searchFleaByKeyword;
 window.searchMercariByKeyword = searchMercariByKeyword;
 window.reloadLiveFleaSoldWithCurrentKeyword = reloadLiveFleaSoldWithCurrentKeyword;
 window.copyFleaKeyword = copyFleaKeyword;
+window.applyRealFleaAveragePrice = applyRealFleaAveragePrice;
