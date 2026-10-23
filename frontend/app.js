@@ -137,7 +137,7 @@ let inventoryFilter = "all";
 let inventorySearchQuery = "";
 
 const SEARCH_HISTORY_KEY = "reseller_search_history_v1";
-const LAST_SEARCH_KEY = "reseller_last_search_v1";
+const LAST_SEARCH_KEY = "reseller_last_search_v2";
 
 // Get search history from localStorage
 function getLocalSearchHistory() {
@@ -342,6 +342,7 @@ window.addEventListener("popstate", (event) => {
 // Restore last search upon page reload
 function restoreLastSearch() {
     try {
+        localStorage.removeItem("reseller_last_search_v1"); // Purge legacy cache with missing shipping data
         const raw = localStorage.getItem(LAST_SEARCH_KEY);
         if (!raw) return false;
         const last = JSON.parse(raw);
@@ -352,20 +353,11 @@ function restoreLastSearch() {
             input.value = last.query;
         }
         toggleClearSearchBtn();
-
         renderSearchHistory();
 
-        // If we saved the results, render them immediately so user sees their previous cards!
-        if (last.items && last.items.length > 0) {
-            renderSearchResults(last.items, last.query);
-            // Load the top item into editor
-            scrapeAuctionById(last.items[0].auction_id, true);
-            showToast(`Restored search for "${last.query}" (${last.items.length} items)`);
-            return true;
-        } else {
-            handleScrape(currentSearchSort, false);
-            return true;
-        }
+        // Always re-fetch live fresh search from server so shipping fees & bids are 100% current!
+        handleScrape(currentSearchSort, false);
+        return true;
     } catch (e) {
         return false;
     }
@@ -1022,11 +1014,21 @@ function renderSearchResults(items, query) {
         const isSelected = item.auction_id === activeSearchAuctionId;
         card.id = `search-card-${item.auction_id}`;
         card.className = `cursor-pointer rounded-xl p-2.5 transition-all text-left border relative group bg-white hover:border-red-500 hover:shadow-md ${isSelected ? 'border-red-500 ring-2 ring-red-400/50 bg-red-50/20' : 'border-slate-200'}`;
+        const buyPrice = parseInt(item.buy_price) || 0;
+        const shipFee = parseInt(item.shipping_fee) || 0;
+        const isFreeShip = Boolean(item.is_free_shipping);
+        const totalBuyCost = item.total_procurement || (buyPrice + shipFee);
+
         card.onclick = () => {
             const inShipEl = document.getElementById("calc-inbound-shipping");
-            if (inShipEl && item.shipping_fee !== undefined) {
-                inShipEl.value = item.shipping_fee;
+            if (inShipEl) {
+                inShipEl.value = shipFee;
             }
+            const buyPriceEl = document.getElementById("calc-buy-price");
+            if (buyPriceEl) {
+                buyPriceEl.value = buyPrice;
+            }
+            runLiveCalculation();
             scrapeAuctionById(item.auction_id);
         };
 
@@ -1051,11 +1053,11 @@ function renderSearchResults(items, query) {
                 <span>⏰ ${item.remaining_time}</span>
             </span>` : (item.is_fixed_price ? '<span class="absolute top-1 right-1 bg-blue-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-xs">⚡ Buy Now</span>' : '');
 
-        const shippingBadgeHtml = item.is_free_shipping ? 
+        const shippingBadgeHtml = isFreeShip ? 
             '<span class="absolute bottom-1 right-1 bg-emerald-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-2xs">送料無料 (Free)</span>' : 
-            (item.shipping_fee > 0 ? 
-                `<span class="absolute bottom-1 right-1 bg-rose-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-2xs">送料 +¥${item.shipping_fee.toLocaleString()}</span>` : 
-                '<span class="absolute bottom-1 right-1 bg-slate-700/80 text-white text-[8px] font-medium px-1 py-0.5 rounded">送料別</span>'
+            (shipFee > 0 ? 
+                `<span class="absolute bottom-1 right-1 bg-rose-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-2xs">送料 +¥${shipFee.toLocaleString()}</span>` : 
+                '<span class="absolute bottom-1 right-1 bg-amber-700 text-white text-[8px] font-bold px-1.5 py-0.5 rounded shadow-2xs">送料落札者負担</span>'
             );
 
         card.innerHTML = `
@@ -1084,22 +1086,22 @@ function renderSearchResults(items, query) {
             <div class="space-y-1 pt-1 border-t border-slate-100 text-[10px]">
                 <div class="flex justify-between items-center text-slate-500">
                     <span>🛒 Bid / Buy:</span>
-                    <b class="text-blue-700 font-bold text-xs">¥${item.buy_price.toLocaleString()}</b>
+                    <b class="text-blue-700 font-bold text-xs">¥${buyPrice.toLocaleString()}</b>
                 </div>
                 <div class="flex justify-between items-center text-slate-500">
                     <span>🚚 Inbound Ship:</span>
-                    ${item.is_free_shipping ? 
+                    ${isFreeShip ? 
                         '<span class="text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded font-bold text-[9px] border border-emerald-200">送料無料 (Free)</span>' : 
-                        (item.shipping_fee > 0 ? 
-                            `<span class="text-rose-700 bg-rose-50 px-1.5 py-0.2 rounded font-black text-[9px] border border-rose-200">+¥${item.shipping_fee.toLocaleString()}</span>` : 
-                            '<span class="text-slate-500 text-[9px]">送料別</span>'
+                        (shipFee > 0 ? 
+                            `<span class="text-rose-700 bg-rose-50 px-1.5 py-0.2 rounded font-black text-[9px] border border-rose-200">+¥${shipFee.toLocaleString()}</span>` : 
+                            '<span class="text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded font-bold text-[9px] border border-amber-200">落札者負担 (送料別)</span>'
                         )
                     }
                 </div>
-                ${item.shipping_fee > 0 ? `
+                ${shipFee > 0 ? `
                 <div class="flex justify-between items-center text-slate-800 bg-slate-100/90 px-1.5 py-0.5 rounded font-bold text-[10px] border border-slate-200">
                     <span class="text-slate-600">💰 Total Buy Cost:</span>
-                    <b class="text-slate-950 font-black">¥${(item.buy_price + item.shipping_fee).toLocaleString()}</b>
+                    <b class="text-slate-950 font-black">¥${totalBuyCost.toLocaleString()}</b>
                 </div>` : ''}
                 <div class="flex justify-between items-center text-slate-500">
                     <span>🏷️ Flea Target:</span>
