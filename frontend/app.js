@@ -473,9 +473,6 @@ function loadSampleProduct(index) {
         sellability: item.sellability || null
     };
 
-    const urlInput = document.getElementById("input-url");
-    if (urlInput) urlInput.value = currentAuction.auction_id;
-
     populateScrapedData(currentAuction);
     
     const sellEl = document.getElementById("calc-sell-price");
@@ -900,10 +897,21 @@ async function handleScrape(sort = currentSearchSort, pushHistory = true) {
     let queryVal = urlInput ? urlInput.value.trim() : "";
     toggleClearSearchBtn();
     
-    // Auto-fill sample if user clicked scrape with an empty input box
-    if (!queryVal) {
-        loadSampleProduct(0);
-        return;
+    // If input is empty or auto-deal label, search the selected category's top keyword
+    if (!queryVal || queryVal.startsWith("Auto-Deal:")) {
+        const catDefaults = {
+            'collectibles': 'ポケモンカード 151',
+            'gaming': 'Nintendo Switch',
+            'laptops': 'レッツノート CF-SZ6',
+            'watches': 'G-SHOCK GW-M5610',
+            'cameras': 'Canon EF 50mm',
+            'electronics': 'iPhone 13'
+        };
+        queryVal = (currentSelectedCategory && catDefaults[currentSelectedCategory]) ? catDefaults[currentSelectedCategory] : 'Nintendo Switch';
+        if (urlInput) {
+            urlInput.value = queryVal;
+            toggleClearSearchBtn();
+        }
     }
 
     if (pushHistory) {
@@ -2702,6 +2710,26 @@ let cachedCategoryInsights = null;
 function onCategoryChanged() {
     const sel = document.getElementById("select-category");
     currentSelectedCategory = sel ? sel.value : 'all';
+
+    // Auto-suggest high-yield keyword in search box for this category if empty or sample
+    const urlInput = document.getElementById("input-url");
+    if (urlInput && (!urlInput.value || urlInput.value.startsWith("SAMPLE-") || urlInput.value.startsWith("Auto-Deal:"))) {
+        const catDefaults = {
+            'collectibles': 'ポケモンカード 151',
+            'gaming': 'Nintendo Switch',
+            'laptops': 'レッツノート CF-SZ6',
+            'watches': 'G-SHOCK GW-M5610',
+            'cameras': 'Canon EF 50mm',
+            'electronics': 'iPhone 13'
+        };
+        if (catDefaults[currentSelectedCategory]) {
+            urlInput.value = catDefaults[currentSelectedCategory];
+            toggleClearSearchBtn();
+        } else if (currentSelectedCategory === 'all') {
+            urlInput.value = '';
+            toggleClearSearchBtn();
+        }
+    }
 }
 
 function onBudgetLimitChanged() {
