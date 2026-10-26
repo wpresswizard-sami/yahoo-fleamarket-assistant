@@ -941,10 +941,17 @@ async function handleScrape(sort = currentSearchSort, pushHistory = true) {
             // Keyword live search
             const sortLabel = sort === 'end' ? 'ending soonest' : (sort === 'bids' ? 'most bids' : 'live items');
             if (loadingText) loadingText.innerText = `Searching Yahoo! Auctions live for "${queryVal}" (${sortLabel})...`;
+            
+            const maxBudget = getSelectedBudgetLimit();
+            const catVal = getSelectedCategory();
+            const bodyPayload = { query: queryVal, limit: 12, sort: sort };
+            if (maxBudget > 0) bodyPayload.max_price = maxBudget;
+            if (catVal && catVal !== 'all') bodyPayload.category = catVal;
+
             const res = await fetch("/api/search", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ query: queryVal, limit: 12, sort: sort })
+                body: JSON.stringify(bodyPayload)
             });
             const data = await res.json();
             if (!res.ok) {
@@ -974,7 +981,7 @@ async function handleScrape(sort = currentSearchSort, pushHistory = true) {
 }
 
 // Render Search Results Grid
-function renderSearchResults(items, query) {
+function renderSearchResults(items, query, isAutoDeal = false) {
     currentSearchResults = items || [];
     const section = document.getElementById("search-results-section");
     const heading = document.getElementById("search-results-heading");
@@ -991,7 +998,7 @@ function renderSearchResults(items, query) {
         }
         grid.innerHTML = `
             <div class="col-span-full py-8 text-center text-slate-500 text-xs">
-                No active auctions matched "<b>${query}</b>". Try another search keyword (e.g. iPhone, Switch, G-Shock, PS5).
+                No active auctions matched "<b>${query}</b>" within your selected budget. Try expanding your budget or choosing another category!
             </div>
         `;
         if (window.lucide) {
@@ -1002,10 +1009,20 @@ function renderSearchResults(items, query) {
 
     section.classList.remove("hidden");
     if (heading) {
-        heading.innerHTML = `
-            <i data-lucide="layout-grid" class="w-4 h-4 text-red-500"></i>
-            <span>Yahoo! Auctions for "<span class="text-red-600 font-bold">${query}</span>" (${items.length} found):</span>
-        `;
+        if (isAutoDeal) {
+            heading.innerHTML = `
+                <div class="flex items-center space-x-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+                    <i data-lucide="sparkles" class="w-4 h-4 text-emerald-600"></i>
+                    <span class="text-emerald-950 font-black">🌟 Auto-Discovered Profitable Deals (${items.length} verified profitable items):</span>
+                </div>
+            `;
+        } else {
+            heading.innerHTML = `
+                <i data-lucide="layout-grid" class="w-4 h-4 text-red-500"></i>
+                <span>Yahoo! Auctions for "<span class="text-red-600 font-bold">${query}</span>" (${items.length} found):</span>
+            `;
+        }
     }
 
     grid.innerHTML = "";
@@ -1148,7 +1165,7 @@ function renderSearchResults(items, query) {
                 </div>` : `
                 <div class="flex justify-between items-center pt-0.5 border-t border-dashed border-slate-200">
                     <span class="font-bold text-slate-600">💰 Est Profit:</span>
-                    <b class="font-black ${profitColor} text-xs">${profitBadge}</b>
+                    <b class="font-black ${profitColor} text-xs">${profitBadge} ${item.profit_margin > 0 ? `<span class="text-[10px] text-emerald-700 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200 ml-0.5">(${item.profit_margin}%)</span>` : ''}</b>
                 </div>`
                 }` : `
                 <div class="flex justify-between items-center text-slate-500">
@@ -2670,3 +2687,392 @@ window.searchMercariByKeyword = searchMercariByKeyword;
 window.reloadLiveFleaSoldWithCurrentKeyword = reloadLiveFleaSoldWithCurrentKeyword;
 window.copyFleaKeyword = copyFleaKeyword;
 window.applyRealFleaAveragePrice = applyRealFleaAveragePrice;
+
+// =====================================================================
+// CATEGORY PROFIT ADVISOR & AUTO DEAL FINDER CONTROLLERS
+// =====================================================================
+
+let currentSelectedCategory = 'all';
+let currentSelectedBudgetLimit = 0;
+let currentAutoDealBudget = 10000;
+let currentAutoDealMinProfit = 1000;
+let currentAutoDealCategory = 'all';
+let cachedCategoryInsights = null;
+
+function onCategoryChanged() {
+    const sel = document.getElementById("select-category");
+    currentSelectedCategory = sel ? sel.value : 'all';
+}
+
+function onBudgetLimitChanged() {
+    const sel = document.getElementById("select-budget-limit");
+    const customInput = document.getElementById("input-custom-budget");
+    if (!sel) return;
+
+    if (sel.value === "custom") {
+        if (customInput) {
+            customInput.classList.remove("hidden");
+            customInput.focus();
+            currentSelectedBudgetLimit = parseInt(customInput.value) || 0;
+        }
+    } else {
+        if (customInput) customInput.classList.add("hidden");
+        currentSelectedBudgetLimit = parseInt(sel.value) || 0;
+    }
+}
+
+function onCustomBudgetChanged() {
+    const customInput = document.getElementById("input-custom-budget");
+    if (customInput) {
+        currentSelectedBudgetLimit = parseInt(customInput.value) || 0;
+    }
+}
+
+function getSelectedBudgetLimit() {
+    const sel = document.getElementById("select-budget-limit");
+    if (sel && sel.value === "custom") {
+        const customInput = document.getElementById("input-custom-budget");
+        return customInput ? (parseInt(customInput.value) || 0) : 0;
+    }
+    return sel ? (parseInt(sel.value) || 0) : 0;
+}
+
+function getSelectedCategory() {
+    const sel = document.getElementById("select-category");
+    return sel ? sel.value : 'all';
+}
+
+// -------------------------------------------------------------
+// Category Profit Advisor Modal
+// -------------------------------------------------------------
+async function openCategoryAdvisorModal() {
+    const modal = document.getElementById("modal-category-advisor");
+    if (!modal) return;
+    modal.classList.remove("hidden");
+
+    const budgetInput = document.getElementById("advisor-budget-input");
+    const budgetVal = budgetInput ? (parseInt(budgetInput.value) || 10000) : 10000;
+    await loadCategoryAdvisorData(budgetVal);
+}
+
+function closeCategoryAdvisorModal() {
+    const modal = document.getElementById("modal-category-advisor");
+    if (modal) modal.classList.add("hidden");
+}
+
+let advisorBudgetDebounce = null;
+function onAdvisorBudgetChanged() {
+    clearTimeout(advisorBudgetDebounce);
+    advisorBudgetDebounce = setTimeout(() => {
+        const budgetInput = document.getElementById("advisor-budget-input");
+        const budgetVal = budgetInput ? (parseInt(budgetInput.value) || 0) : 0;
+        loadCategoryAdvisorData(budgetVal);
+    }, 300);
+}
+
+async function loadCategoryAdvisorData(budgetVal) {
+    try {
+        const res = await fetch(`/api/category-insights?budget=${budgetVal}`);
+        if (!res.ok) throw new Error("Failed to load category insights");
+        const data = await res.json();
+        cachedCategoryInsights = data;
+
+        // Render dynamic advice
+        const adviceBox = document.getElementById("advisor-dynamic-advice");
+        if (adviceBox && data.budget_advice) {
+            adviceBox.innerHTML = `
+                <div class="space-y-1">
+                    <div class="flex items-center space-x-1.5 font-black text-amber-900">
+                        <span>🎯 Recommended for your budget:</span>
+                        <span class="px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300 font-extrabold">${data.budget_advice.recommended_category_name || ''}</span>
+                        <span class="text-emerald-700 font-black">(${data.budget_advice.expected_margin || ''} ROI)</span>
+                    </div>
+                    <p class="text-xs text-amber-950 font-medium leading-relaxed">${data.budget_advice.advice_ur || ''}</p>
+                </div>
+            `;
+        }
+
+        // Render category ranking cards
+        const container = document.getElementById("category-advisor-cards-container");
+        if (!container || !data.categories) return;
+
+        container.innerHTML = "";
+        data.categories.forEach((cat, index) => {
+            const card = document.createElement("div");
+            card.className = "bg-white p-3.5 rounded-xl border border-slate-200 hover:border-amber-400 hover:shadow-sm transition space-y-2";
+            
+            const rankBadge = index === 0 ? "bg-amber-500 text-white font-black" : (index === 1 ? "bg-slate-700 text-white font-bold" : (index === 2 ? "bg-amber-800 text-white font-bold" : "bg-slate-200 text-slate-700 font-bold"));
+            
+            card.innerHTML = `
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                    <div class="flex items-center space-x-2">
+                        <span class="w-6 h-6 rounded-full ${rankBadge} text-[11px] flex items-center justify-center shrink-0">#${cat.rank || index + 1}</span>
+                        <span class="font-extrabold text-sm text-slate-900">${cat.name}</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">${cat.badge}</span>
+                    </div>
+                    <div class="flex items-center space-x-2 self-start sm:self-auto">
+                        <button type="button" onclick="runCategoryAutoScan('${cat.id}')" class="px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold rounded-lg text-xs shadow-xs flex items-center space-x-1 transition">
+                            <i data-lucide="bot" class="w-3.5 h-3.5"></i>
+                            <span>🎯 Auto-Scan Deals</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] py-1 bg-slate-50/70 p-2 rounded-lg">
+                    <div>
+                        <span class="text-slate-400 block text-[10px] uppercase font-bold">Average Margin</span>
+                        <b class="text-emerald-700 font-black">${cat.avg_margin_percent}% ROI</b>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 block text-[10px] uppercase font-bold">Est Net Profit / Item</span>
+                        <b class="text-slate-800 font-bold">${cat.avg_profit_range}</b>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 block text-[10px] uppercase font-bold">Turnaround Speed</span>
+                        <b class="text-amber-700 font-bold">⚡ ${cat.turnaround_days}</b>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 block text-[10px] uppercase font-bold">Ideal Budget</span>
+                        <b class="text-blue-700 font-bold">${cat.recommended_budget ? cat.recommended_budget.split('(')[0] : 'Any'}</b>
+                    </div>
+                </div>
+
+                <div class="text-[11px] text-slate-600 space-y-1">
+                    <p><b class="text-slate-800">Kyun Zada Bikta Hai:</b> ${cat.why_profitable || ''}</p>
+                    <p class="text-[10px] text-slate-500"><b class="text-slate-700">🚚 Shipping Tip:</b> ${cat.shipping_tip || ''}</p>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+
+        if (window.lucide) {
+            try { lucide.createIcons(); } catch(e) {}
+        }
+    } catch (e) {
+        console.error("Error loading category insights:", e);
+    }
+}
+
+function runCategoryAutoScan(catId) {
+    closeCategoryAdvisorModal();
+    // Set category selector
+    const selCat = document.getElementById("select-category");
+    if (selCat) selCat.value = catId;
+    currentSelectedCategory = catId;
+
+    // Set auto deal category
+    const autoCatSel = document.getElementById("auto-deal-category");
+    if (autoCatSel) autoCatSel.value = catId;
+    currentAutoDealCategory = catId;
+
+    openAutoDealModal();
+}
+
+// -------------------------------------------------------------
+// Auto Deal Finder Modal & Execution
+// -------------------------------------------------------------
+function openAutoDealModal() {
+    const modal = document.getElementById("modal-auto-deals");
+    if (!modal) return;
+    modal.classList.remove("hidden");
+
+    // Sync from search bar category
+    const selCat = document.getElementById("select-category");
+    const autoCat = document.getElementById("auto-deal-category");
+    if (selCat && autoCat) {
+        autoCat.value = selCat.value;
+        currentAutoDealCategory = selCat.value;
+    }
+
+    // Sync budget
+    const searchBudget = getSelectedBudgetLimit();
+    if (searchBudget > 0) {
+        setAutoDealBudget(searchBudget);
+    } else {
+        setAutoDealBudget(10000);
+    }
+
+    updateAutoDealLiveAdvice();
+    if (window.lucide) {
+        try { lucide.createIcons(); } catch(e) {}
+    }
+}
+
+function closeAutoDealModal() {
+    const modal = document.getElementById("modal-auto-deals");
+    if (modal) modal.classList.add("hidden");
+}
+
+function setAutoDealBudget(val) {
+    currentAutoDealBudget = parseInt(val) || 0;
+    
+    // Update chip styling
+    const chips = document.querySelectorAll(".auto-budget-chip");
+    chips.forEach(chip => {
+        const chipVal = parseInt(chip.getAttribute("data-val")) || 0;
+        if (chipVal === currentAutoDealBudget) {
+            chip.className = "auto-budget-chip px-2 py-1.5 rounded-lg border border-emerald-500 font-extrabold bg-emerald-50 text-emerald-800 text-center";
+        } else {
+            chip.className = "auto-budget-chip px-2 py-1.5 rounded-lg border border-slate-200 font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 text-center";
+        }
+    });
+
+    const display = document.getElementById("auto-deal-budget-display");
+    if (display) {
+        display.innerText = currentAutoDealBudget > 0 ? `Under ¥${currentAutoDealBudget.toLocaleString()}` : "Unlimited (All)";
+    }
+
+    const customInput = document.getElementById("auto-deal-custom-budget");
+    if (customInput && currentAutoDealBudget > 0 && ![5000, 10000, 20000, 35000, 50000].includes(currentAutoDealBudget)) {
+        customInput.value = currentAutoDealBudget;
+    } else if (customInput && [0, 5000, 10000, 20000, 35000, 50000].includes(currentAutoDealBudget)) {
+        customInput.value = "";
+    }
+
+    updateAutoDealLiveAdvice();
+}
+
+function onAutoDealCustomBudgetInput() {
+    const customInput = document.getElementById("auto-deal-custom-budget");
+    const val = customInput ? (parseInt(customInput.value) || 0) : 0;
+    if (val > 0) {
+        currentAutoDealBudget = val;
+        // Unhighlight chips
+        const chips = document.querySelectorAll(".auto-budget-chip");
+        chips.forEach(chip => {
+            chip.className = "auto-budget-chip px-2 py-1.5 rounded-lg border border-slate-200 font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 text-center";
+        });
+        const display = document.getElementById("auto-deal-budget-display");
+        if (display) display.innerText = `Custom: ¥${val.toLocaleString()}`;
+        updateAutoDealLiveAdvice();
+    }
+}
+
+function setAutoDealMinProfit(val) {
+    currentAutoDealMinProfit = parseInt(val) || 1000;
+    const chips = document.querySelectorAll(".auto-profit-chip");
+    chips.forEach(chip => {
+        const chipVal = parseInt(chip.getAttribute("data-val")) || 0;
+        if (chipVal === currentAutoDealMinProfit) {
+            chip.className = "auto-profit-chip px-2 py-1.5 rounded-lg border border-emerald-500 font-extrabold bg-emerald-50 text-emerald-800 text-center";
+        } else {
+            chip.className = "auto-profit-chip px-2 py-1.5 rounded-lg border border-slate-200 font-bold bg-slate-100 text-slate-700 text-center";
+        }
+    });
+}
+
+function onAutoDealCategoryOrBudgetChanged() {
+    const sel = document.getElementById("auto-deal-category");
+    if (sel) currentAutoDealCategory = sel.value;
+    updateAutoDealLiveAdvice();
+}
+
+function updateAutoDealLiveAdvice() {
+    const adviceEl = document.getElementById("auto-deal-live-advice");
+    if (!adviceEl) return;
+
+    const b = currentAutoDealBudget;
+
+    if (b <= 0) {
+        adviceEl.innerText = "All categories me scan karega. Unlimited budget ke sath PS5, Switch OLED aur Laptops me highest absolute yen profit milega.";
+    } else if (b <= 10000) {
+        adviceEl.innerText = `Aap ke ¥${b.toLocaleString()} budget ke mutabik: Anime Cards (Pokemon 151 Box) aur Retro Gaming (GameBoy Advance) me sabse kam risk aur 35-50% profit margin hai! Nekopos (¥210) shipping lagti hai.`;
+    } else if (b <= 30000) {
+        adviceEl.innerText = `Aap ke ¥${b.toLocaleString()} budget ke mutabik: Nintendo Switch OLED, PS4 Pro aur Let's note CF-SZ6 best hain! Har item par ¥4,500 se ¥8,500 seedha profit banta hai.`;
+    } else {
+        adviceEl.innerText = `Aap ka budget (¥${b.toLocaleString()}) high liquidity ke liye perfect hai! iPhone 13, iPad aur Sony Mirrorless bodies 24 ghante ke andar cash me convert ho jati hain.`;
+    }
+}
+
+async function executeAutoDealScan() {
+    closeAutoDealModal();
+    switchTab('sourcing');
+
+    const catSel = document.getElementById("auto-deal-category");
+    const category = catSel ? catSel.value : 'all';
+    const maxBudget = currentAutoDealBudget > 0 ? currentAutoDealBudget : null;
+    const minProfit = currentAutoDealMinProfit || 1000;
+
+    // Sync back to top bar
+    const topCat = document.getElementById("select-category");
+    if (topCat) topCat.value = category;
+    currentSelectedCategory = category;
+
+    const topBudget = document.getElementById("select-budget-limit");
+    if (topBudget) {
+        if ([0, 5000, 10000, 20000, 35000, 50000].includes(currentAutoDealBudget)) {
+            topBudget.value = currentAutoDealBudget.toString();
+        } else if (currentAutoDealBudget > 0) {
+            topBudget.value = "custom";
+            const topCustom = document.getElementById("input-custom-budget");
+            if (topCustom) {
+                topCustom.classList.remove("hidden");
+                topCustom.value = currentAutoDealBudget;
+            }
+        }
+    }
+
+    const btnAuto = document.getElementById("btn-auto-deals");
+    const loading = document.getElementById("scrape-loading");
+    const loadingText = document.getElementById("loading-text");
+    if (btnAuto) btnAuto.disabled = true;
+    if (loading) loading.classList.remove("hidden");
+    if (loadingText) {
+        const catName = category === 'all' ? 'All Top Categories' : category.toUpperCase();
+        loadingText.innerText = `🤖 Auto-Scanning live Yahoo Auctions for profitable ${catName} deals (Budget: ${maxBudget ? '¥' + maxBudget.toLocaleString() : 'Any'}, Min Profit: +¥${minProfit.toLocaleString()})...`;
+    }
+
+    try {
+        const res = await fetch("/api/auto-deals", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                category: category,
+                max_budget: maxBudget,
+                min_profit: minProfit,
+                sort_by: "profit",
+                limit: 16
+            })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(data.detail || "Auto-deal scan failed");
+        }
+
+        if (!data.deals || data.deals.length === 0) {
+            showToast(`Budget ¥${maxBudget ? maxBudget.toLocaleString() : 'All'} ke mutabik abhi koi profit deal nahi mili. Budget thora barha kar check karein!`, true);
+            renderSearchResults([], `Auto-Deal: ${category}`);
+            return;
+        }
+
+        renderSearchResults(data.deals, `Auto-Deal Finder (${category.toUpperCase()})`, true);
+        showToast(`🎉 Zabardast! ${data.deals.length} profitable deals mili hain aap ke budget me!`);
+
+        // Auto load the most profitable deal
+        if (data.deals[0] && data.deals[0].auction_id) {
+            await scrapeAuctionById(data.deals[0].auction_id, true);
+        }
+    } catch (err) {
+        showToast(err.message, true);
+    } finally {
+        if (btnAuto) btnAuto.disabled = false;
+        if (loading) loading.classList.add("hidden");
+    }
+}
+
+// Global exposure
+window.onCategoryChanged = onCategoryChanged;
+window.onBudgetLimitChanged = onBudgetLimitChanged;
+window.onCustomBudgetChanged = onCustomBudgetChanged;
+window.openCategoryAdvisorModal = openCategoryAdvisorModal;
+window.closeCategoryAdvisorModal = closeCategoryAdvisorModal;
+window.onAdvisorBudgetChanged = onAdvisorBudgetChanged;
+window.runCategoryAutoScan = runCategoryAutoScan;
+window.openAutoDealModal = openAutoDealModal;
+window.closeAutoDealModal = closeAutoDealModal;
+window.setAutoDealBudget = setAutoDealBudget;
+window.onAutoDealCustomBudgetInput = onAutoDealCustomBudgetInput;
+window.setAutoDealMinProfit = setAutoDealMinProfit;
+window.onAutoDealCategoryOrBudgetChanged = onAutoDealCategoryOrBudgetChanged;
+window.executeAutoDealScan = executeAutoDealScan;

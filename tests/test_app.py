@@ -258,5 +258,34 @@ class TestAppEndpoints(unittest.TestCase):
         self.assertIn("stats", data)
         self.assertGreater(data["stats"]["avg_sold_price"], 10000)
 
+    def test_14_category_insights_and_budget_advice(self):
+        # 1. Test Category Insights ranking
+        res = client.get("/api/category-insights?budget=10000")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        categories = data["categories"]
+        self.assertEqual(len(categories), 6)
+        # Top rank is Anime & Collectibles with 35-50% margin
+        self.assertEqual(categories[0]["id"], "collectibles")
+        self.assertIn("35%", categories[0]["badge"])
+        
+        # 2. Test budget advice
+        advice = data["budget_advice"]
+        self.assertEqual(advice["budget"], 10000)
+        self.assertIn("Anime Cards", advice["advice_ur"])
+
+    def test_15_search_price_filter(self):
+        # Test max_price limit in search
+        res = client.post("/api/search", json={
+            "query": "PS4",
+            "limit": 5,
+            "max_price": 5000
+        })
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["max_price"], 5000)
+        for item in data["items"]:
+            self.assertLessEqual(item["buy_price"], 5000)
+
 if __name__ == "__main__":
     unittest.main()

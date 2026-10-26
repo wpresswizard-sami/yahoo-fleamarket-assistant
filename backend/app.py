@@ -67,6 +67,17 @@ class SearchRequest(BaseModel):
     query: str
     limit: Optional[int] = 12
     sort: Optional[str] = "default"
+    min_price: Optional[int] = None
+    max_price: Optional[int] = None
+    category: Optional[str] = "all"
+
+class AutoDealsRequest(BaseModel):
+    category: Optional[str] = "all"
+    max_budget: Optional[int] = None
+    min_budget: Optional[int] = None
+    min_profit: Optional[int] = 1000
+    sort_by: Optional[str] = "profit"
+    limit: Optional[int] = 16
 
 class ScrapeRequest(BaseModel):
     url: str
@@ -147,7 +158,13 @@ def api_search(req: SearchRequest):
     query = req.query.strip()
     if not query:
         raise HTTPException(status_code=400, detail="Search query is required")
-    items = search_yahoo_auctions(query, limit=req.limit or 12, sort=req.sort or "default")
+    items = search_yahoo_auctions(
+        query,
+        limit=req.limit or 12,
+        sort=req.sort or "default",
+        min_price=req.min_price,
+        max_price=req.max_price
+    )
     
     # Enrich with real-time sellability metrics
     for item in items:
@@ -166,8 +183,31 @@ def api_search(req: SearchRequest):
     return {
         "query": query,
         "count": len(items),
-        "items": items
+        "items": items,
+        "min_price": req.min_price,
+        "max_price": req.max_price
     }
+
+@app.get("/api/category-insights")
+def api_category_insights(budget: Optional[int] = None):
+    from backend.market_radar import get_category_profit_insights, get_budget_recommendations
+    return {
+        "categories": get_category_profit_insights(),
+        "budget_advice": get_budget_recommendations(budget)
+    }
+
+@app.post("/api/auto-deals")
+def api_auto_deals(req: AutoDealsRequest):
+    from backend.market_radar import find_profitable_deals
+    result = find_profitable_deals(
+        category=req.category or "all",
+        max_budget=req.max_budget,
+        min_budget=req.min_budget,
+        min_profit=req.min_profit or 1000,
+        sort_by=req.sort_by or "profit",
+        limit=req.limit or 16
+    )
+    return result
 
 @app.post("/api/scrape")
 def api_scrape(req: ScrapeRequest):

@@ -444,6 +444,21 @@ BASELINES = [
 
 def _get_baseline_flea_price(clean_q: str) -> Dict[str, Any]:
     low = clean_q.lower()
+    # Reject accessories (screen protectors, cables, cases, storage bags, stands) from matching console/device baselines
+    if any(w in low for w in ['フィルム', 'ガラス', '保護', 'カバー', 'ケース', 'スタンド', 'ケーブル', 'シール', 'ステッカー', '互換', 'アダプター', 'パーツ', '収納', 'ポーチ', 'バッグ', 'キャリング']):
+        return {
+            "success": False,
+            "query": clean_q,
+            "avg_sold_price": 0,
+            "median_sold_price": 0,
+            "min_sold_price": 0,
+            "max_sold_price": 0,
+            "sample_count": 0,
+            "total_collected": 0,
+            "pages_scraped": 0,
+            "source": "Accessory / Not Console"
+        }
+
     for pattern, avg_p, min_p, max_p, note in BASELINES:
         if re.search(pattern, low):
             return {
@@ -575,9 +590,10 @@ def estimate_real_flea_price(title: str, buy_price: int = 0) -> Dict[str, Any]:
     based on hardware specs, CPU generation, model tiers, rather than arbitrary percentages.
     """
     t = (title or "").lower()
+    is_accessory = any(w in t for w in ['フィルム', 'ガラス', '保護', 'カバー', 'ケース', 'スタンド', 'ケーブル', 'シール', 'ステッカー', '互換', 'アダプター', 'パーツ', '収納', 'ポーチ', 'バッグ', 'キャリング'])
 
     # 1. Intel 11th / 12th / 13th Gen Laptops (HP 250 G8, Core i3 1115G4, Core i5 1135G7, 12th/13th Gen)
-    if re.search(r'1115g4|1135g7|1165g7|1185g7|11世代|11th|12世代|12th|13世代|i[357]-11|i[357]-12|hp\s*250\s*g8', t):
+    if not is_accessory and re.search(r'1115g4|1135g7|1165g7|1185g7|11世代|11th|12世代|12th|13世代|i[357]-11|i[357]-12|hp\s*250\s*g8', t):
         min_sold = 19000
         max_sold = 29800
         sweet_spot = 19600
@@ -617,7 +633,7 @@ def estimate_real_flea_price(title: str, buy_price: int = 0) -> Dict[str, Any]:
         specs_note = "Intel 6th/7th Gen budget laptop (¥8.5k-¥14k)"
         is_custom = True
     # 5. Apple MacBooks (M1 / M2 / M3 Apple Silicon)
-    elif re.search(r'macbook', t) and re.search(r'm1|m2|m3', t):
+    elif not is_accessory and re.search(r'macbook', t) and re.search(r'm1|m2|m3', t):
         min_sold = 58000
         max_sold = 85000
         sweet_spot = 64000
@@ -627,7 +643,7 @@ def estimate_real_flea_price(title: str, buy_price: int = 0) -> Dict[str, Any]:
         specs_note = "Apple Silicon M-Series MacBook (Premium Liquidity)"
         is_custom = True
     # 6. Nintendo Switch OLED
-    elif re.search(r'有機el|oled', t) and re.search(r'switch|スイッチ', t):
+    elif not is_accessory and re.search(r'有機el|oled', t) and re.search(r'switch|スイッチ', t):
         min_sold = 27500
         max_sold = 33500
         sweet_spot = 30800
@@ -637,7 +653,7 @@ def estimate_real_flea_price(title: str, buy_price: int = 0) -> Dict[str, Any]:
         specs_note = "Nintendo Switch OLED model (Top-Tier Liquidity)"
         is_custom = True
     # 7. Apple iPhone 13
-    elif re.search(r'iphone\s*13', t):
+    elif not is_accessory and re.search(r'iphone\s*13', t):
         min_sold = 50000
         max_sold = 62000
         sweet_spot = 55000
@@ -891,4 +907,291 @@ def calculate_sellability(
             "mercari_sold": mercari_sold_url,
             "yahoo_sold": yahoo_sold_url
         }
+    }
+
+
+# =====================================================================
+# CATEGORY PROFITABILITY ADVISOR & AUTO DEAL SCANNER
+# =====================================================================
+
+CATEGORY_PROFIT_INSIGHTS: List[Dict[str, Any]] = [
+    {
+        "id": "collectibles",
+        "rank": 1,
+        "name": "Anime & Collectibles",
+        "name_ur": "Anime Figures & Trading Cards (Highest Profit Margin)",
+        "icon": "sparkles",
+        "badge": "🔥 35% - 50% ROI (Highest Margin)",
+        "avg_margin_percent": 42.5,
+        "avg_profit_range": "¥3,500 ~ ¥7,500",
+        "turnaround_days": "1 - 2 Days",
+        "turnaround_level": "Extremely Fast",
+        "risk_level": "Very Low",
+        "shipping_tip": "¥210 Nekopos (A4 / 3cm) - Envelopes & Card sleeves fit easily, minimal shipping cost!",
+        "why_profitable": "Japanese anime fans and global card collectors buy immediately without haggling. Sealed boxes (Pokemon 151, One Piece) rarely drop in value.",
+        "recommended_budget": "¥3,000 ~ ¥15,000 (Low budget, maximum margin)",
+        "top_keywords": ["ポケモンカード 151 BOX", "ワンピースカード 新時代の主役", "初音ミク フィギュア", "遊戯王 25th"],
+        "typical_buy_range": [3000, 15000]
+    },
+    {
+        "id": "gaming",
+        "rank": 2,
+        "name": "Gaming & Consoles",
+        "name_ur": "Video Games & Retro Consoles (Continuous High Buyer Demand)",
+        "icon": "gamepad-2",
+        "badge": "🎮 30% - 45% ROI (High Demand)",
+        "avg_margin_percent": 36.0,
+        "avg_profit_range": "¥4,000 ~ ¥8,500",
+        "turnaround_days": "1 - 3 Days",
+        "turnaround_level": "Very Fast",
+        "risk_level": "Low",
+        "shipping_tip": "Game cartridges/discs ship for ¥210 Nekopos; consoles ship for ¥750 Takkyubin 60.",
+        "why_profitable": "Retro handhelds (GameBoy Advance SP, Nintendo 3DS LL) have huge margins on Yahoo and sell fast on Flea. PS4 Pro & Switch OLED have 24/7 continuous buyers.",
+        "recommended_budget": "¥5,000 ~ ¥30,000",
+        "top_keywords": ["ゲームボーイアドバンスSP 本体", "Nintendo Switch 有機EL", "PS4 Pro 1TB", "Nintendo 3DS LL 本体", "Switch Lite 本体"],
+        "typical_buy_range": [5000, 30000]
+    },
+    {
+        "id": "laptops",
+        "rank": 3,
+        "name": "Laptops & PC",
+        "name_ur": "Business Laptops & PC (Office/Student Telework Demand)",
+        "icon": "laptop",
+        "badge": "💻 30% - 40% ROI (High Yen Profit)",
+        "avg_margin_percent": 34.5,
+        "avg_profit_range": "¥4,500 ~ ¥9,000",
+        "turnaround_days": "2 - 4 Days",
+        "turnaround_level": "Fast",
+        "risk_level": "Low",
+        "shipping_tip": "Takkyubin 60 to 80 (¥750 - ¥850). Use bubble wrap securely.",
+        "why_profitable": "Japanese corporate surplus laptops (Let's note CF-SZ6, ThinkPad X280) are sold in lots for cheap on Yahoo Auctions. Teleworkers buy them at ¥14k-¥19k.",
+        "recommended_budget": "¥8,000 ~ ¥25,000",
+        "top_keywords": ["レッツノート CF-SZ6 Core i5", "ThinkPad X280 Core i5", "DELL Vostro 3580 Core i5"],
+        "typical_buy_range": [8000, 25000]
+    },
+    {
+        "id": "watches",
+        "rank": 4,
+        "name": "Japanese Watches",
+        "name_ur": "Japanese Branded Watches (G-Shock, Seiko - Evergreen)",
+        "icon": "watch",
+        "badge": "⌚ 25% - 35% ROI (Bulletproof Resell)",
+        "avg_margin_percent": 29.5,
+        "avg_profit_range": "¥3,500 ~ ¥6,500",
+        "turnaround_days": "2 - 4 Days",
+        "turnaround_level": "Fast",
+        "risk_level": "Very Low",
+        "shipping_tip": "¥210 Nekopos or ¥520 Compact box. Never breaks in shipping.",
+        "why_profitable": "Casio G-Shock GW-M5610 (Tough Solar) and Seiko 5 mechanicals never run out of battery/style. Japanese buyers look for solar/radio sync models.",
+        "recommended_budget": "¥6,000 ~ ¥20,000",
+        "top_keywords": ["G-SHOCK GW-M5610U ソーラー電波", "セイコー5 スポーツ 自動巻き", "G-SHOCK DW-5600"],
+        "typical_buy_range": [6000, 20000]
+    },
+    {
+        "id": "cameras",
+        "rank": 5,
+        "name": "Cameras & Lenses",
+        "name_ur": "Cameras & Prime Lenses (Big Per-Item Yen Profit)",
+        "icon": "camera",
+        "badge": "📷 20% - 35% ROI (Pro Niche)",
+        "avg_margin_percent": 25.0,
+        "avg_profit_range": "¥4,500 ~ ¥12,000",
+        "turnaround_days": "3 - 5 Days",
+        "turnaround_level": "Steady",
+        "risk_level": "Medium (Check lens clarity)",
+        "shipping_tip": "Takkyubin Compact (¥520) or Takkyubin 60 (¥750). Wrap with anti-shock bubble wrap.",
+        "why_profitable": "Nifty-Fifty prime lenses (Canon EF 50mm F1.8 STM) and mirrorless bodies (Sony a6000) have consistent global resale floor and large yen profits.",
+        "recommended_budget": "¥10,000 ~ ¥45,000",
+        "top_keywords": ["Canon EF 50mm F1.8 STM", "Sony α6000 ボディ", "Fujifilm X-T10"],
+        "typical_buy_range": [10000, 45000]
+    },
+    {
+        "id": "electronics",
+        "rank": 6,
+        "name": "Apple & Mobile Gadgets",
+        "name_ur": "Apple & Mobile Electronics (Fastest 24-Hour Cash Recovery)",
+        "icon": "smartphone",
+        "badge": "⚡ 15% - 25% ROI (Instant 24h Cash)",
+        "avg_margin_percent": 20.0,
+        "avg_profit_range": "¥5,000 ~ ¥10,000",
+        "turnaround_days": "Under 24 Hours",
+        "turnaround_level": "Instant 24-Hour Liquidity",
+        "risk_level": "Very Low (If screen is clean)",
+        "shipping_tip": "¥210 Nekopos or ¥520 Compact box.",
+        "why_profitable": "iPhones (iPhone 12/13), iPads (9th Gen), and Sony XM4 noise-canceling headphones have huge daily traffic. Items sell often within 24 hours.",
+        "recommended_budget": "¥20,000 ~ ¥60,000 (Requires higher capital)",
+        "top_keywords": ["iPhone 13 128GB SIMフリー", "iPad 第9世代 64GB", "Sony WH-1000XM4"],
+        "typical_buy_range": [20000, 60000]
+    }
+]
+
+
+def get_category_profit_insights() -> List[Dict[str, Any]]:
+    """Returns sorted category insights ranked by historical average profit margin."""
+    return sorted(CATEGORY_PROFIT_INSIGHTS, key=lambda c: c.get("rank", 99))
+
+
+def get_budget_recommendations(budget: Optional[int] = None) -> Dict[str, Any]:
+    """Provides human-readable advice in Roman Urdu tailored to the user's specific buying budget."""
+    if budget is None or budget <= 0:
+        return {
+            "budget": None,
+            "recommended_category": "collectibles",
+            "recommended_category_name": "🧸 Anime & Collectibles (Pokemon / Figures)",
+            "expected_margin": "35% - 50%",
+            "advice_ur": "Sabse Zada Profit Margin Anime Collectibles & Trading Cards (Pokemon 151) me hai. Agar aap ka budget limited hai ya start kar rahe hain, to yeh sabse safe aur high-profit category hai (¥210 shipping).",
+            "alternative_category": "gaming",
+            "alternative_category_name": "🎮 Retro Gaming (GameBoy Advance / Switch)"
+        }
+    elif budget <= 10000:
+        return {
+            "budget": budget,
+            "recommended_category": "collectibles",
+            "recommended_category_name": "🧸 Anime & Collectibles & 🎮 Retro Gaming",
+            "expected_margin": "35% - 50%",
+            "advice_ur": f"Aap ke ¥{budget:,} budget ke mutabik: Anime Cards (Pokemon 151 Box) aur Retro Gaming (GameBoy Advance SP / DS Lite) sabse behtareen hain! In me 35% se 50% profit margin milta hai aur Nekopos (¥210) ki sasti shipping lagti hai.",
+            "alternative_category": "watches",
+            "alternative_category_name": "⌚ Casio G-Shock (GW-M5610)"
+        }
+    elif budget <= 30000:
+        return {
+            "budget": budget,
+            "recommended_category": "gaming",
+            "recommended_category_name": "🎮 Gaming Consoles & 💻 Business Laptops",
+            "expected_margin": "30% - 40%",
+            "advice_ur": f"Aap ke ¥{budget:,} budget ke mutabik: Nintendo Switch OLED, PS4 Pro, aur Panasonic Let's note CF-SZ6 sabse zabardast hain! Har item par ¥4,500 se ¥8,500 ka seedha net profit milta hai aur 1-3 din me foran sell ho jate hain.",
+            "alternative_category": "watches",
+            "alternative_category_name": "⌚ Seiko 5 & G-Shock Solar"
+        }
+    else:
+        return {
+            "budget": budget,
+            "recommended_category": "electronics",
+            "recommended_category_name": "📱 Apple & Gadgets & 📷 Cameras",
+            "expected_margin": "20% - 30%",
+            "advice_ur": f"Aap ka budget (¥{budget:,}) kafi acha hai! iPhone 13, iPad 9th Gen, aur Sony Alpha cameras me daily instant liquidity hai. Ad post karne ke 24 ghante ke andar sell ho jate hain aur per-item profit ¥7,000+ banta hai.",
+            "alternative_category": "gaming",
+            "alternative_category_name": "🎮 PS5 & Switch OLED Bundles"
+        }
+
+
+def find_profitable_deals(
+    category: Optional[str] = "all",
+    max_budget: Optional[int] = None,
+    min_budget: Optional[int] = None,
+    min_profit: int = 1000,
+    sort_by: str = "profit",
+    limit: int = 16
+) -> Dict[str, Any]:
+    """
+    Intelligent auto-scanner that queries live Yahoo Auctions for proven high-turnover products,
+    evaluates real Flea Market resale history, and strictly filters only verified profitable deals
+    within the user's budget.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+    from backend.scraper import search_yahoo_auctions
+
+    # 1. Determine seed search queries based on category and budget
+    cat_map = {c["id"]: c for c in CATEGORY_PROFIT_INSIGHTS}
+    selected_queries = []
+
+    if category and category != "all" and category in cat_map:
+        info = cat_map[category]
+        selected_queries.extend(info.get("top_keywords", []))
+    else:
+        # Cross-category smart selection: pick 1-2 keywords per category fitting the budget
+        for cat_info in CATEGORY_PROFIT_INSIGHTS:
+            typical_min = cat_info.get("typical_buy_range", [0, 999999])[0]
+            if max_budget is not None and max_budget > 0 and typical_min > max_budget:
+                continue  # Skip expensive categories if user budget is low
+            kw_list = cat_info.get("top_keywords", [])
+            if kw_list:
+                selected_queries.append(kw_list[0])
+                if len(kw_list) > 1 and (not max_budget or max_budget >= 15000):
+                    selected_queries.append(kw_list[1])
+
+    if not selected_queries:
+        # Fallback to safe low-cost queries
+        selected_queries = ["ポケモンカード 151 BOX", "ゲームボーイアドバンスSP 本体", "G-SHOCK DW-5600"]
+
+    # Limit search concurrency to top 6 seed queries
+    queries_to_scan = selected_queries[:6]
+
+    def _scan_worker(query_str: str) -> List[Dict[str, Any]]:
+        try:
+            return search_yahoo_auctions(
+                query=query_str,
+                limit=6,
+                sort="end",
+                min_price=min_budget,
+                max_price=max_budget
+            )
+        except Exception:
+            return []
+
+    all_raw_items: List[Dict[str, Any]] = []
+    seen_ids = set()
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        for res_list in executor.map(_scan_worker, queries_to_scan):
+            for it in res_list:
+                aid = it.get("auction_id")
+                if aid and aid not in seen_ids:
+                    seen_ids.add(aid)
+                    all_raw_items.append(it)
+
+    # 2. Strict profit & budget validation filter
+    profitable_deals: List[Dict[str, Any]] = []
+    for it in all_raw_items:
+        buy_p = it.get("buy_price", 0)
+        target_p = it.get("target_sell_price", 0)
+        profit = it.get("estimated_profit")
+        is_over = it.get("is_overpriced", False)
+
+        # Reject pure accessories and empty box listings from profitable deal scanner
+        t_low = (it.get("title", "") or "").lower()
+        if any(w in t_low for w in ['フィルム', '保護シート', 'シリコンカバー', 'シリコンケース', '空箱', '箱のみ', '説明書のみ', 'スタンドのみ', '収納', 'ポーチ', 'バッグ', 'キャリング']):
+            continue
+
+        # Budget check
+        if max_budget is not None and max_budget > 0 and buy_p > max_budget:
+            continue
+        if min_budget is not None and min_budget > 0 and buy_p < min_budget:
+            continue
+
+        # Profit validation
+        if target_p <= 0 or profit is None:
+            continue
+        if is_over or profit < min_profit:
+            continue
+
+        # Attach real-time sellability metrics
+        it["sellability"] = calculate_sellability(
+            query_or_title=it.get("title", ""),
+            buy_price=buy_p,
+            target_sell_price=target_p,
+            bids_count=it.get("bids", 0),
+            is_ending_soon=it.get("is_ending_soon", False)
+        )
+        profitable_deals.append(it)
+
+    # 3. Sort deals according to requested strategy
+    if sort_by == "margin":
+        profitable_deals.sort(key=lambda x: x.get("profit_margin", 0), reverse=True)
+    elif sort_by == "ending_soon":
+        profitable_deals.sort(key=lambda x: x.get("left_seconds") if x.get("left_seconds") is not None else 9999999)
+    else:  # "profit" default
+        profitable_deals.sort(key=lambda x: x.get("estimated_profit", 0), reverse=True)
+
+    advice = get_budget_recommendations(max_budget)
+
+    return {
+        "success": True,
+        "count": len(profitable_deals[:limit]),
+        "category": category,
+        "max_budget": max_budget,
+        "min_budget": min_budget,
+        "min_profit": min_profit,
+        "budget_advice": advice,
+        "deals": profitable_deals[:limit]
     }

@@ -595,10 +595,11 @@ def format_remaining_time(seconds: Optional[float]) -> str:
     except Exception:
         return ""
 
-def search_yahoo_auctions(query: str, limit: int = 12, sort: str = "default") -> List[Dict[str, Any]]:
+def search_yahoo_auctions(query: str, limit: int = 12, sort: str = "default", min_price: Optional[int] = None, max_price: Optional[int] = None) -> List[Dict[str, Any]]:
     """
     Searches Yahoo Auctions for any user keyword and returns a list of matching items
     with title, price, photos, remaining time, bids count, and live estimated profit for flea market resale.
+    Supports budget limit constraints via aucminprice and aucmaxprice.
     """
     query = query.strip()
     if not query:
@@ -616,7 +617,13 @@ def search_yahoo_auctions(query: str, limit: int = 12, sort: str = "default") ->
     elif sort == "price_asc":
         sort_param = "&s1=cbids&o1=a" # Lowest price
 
-    url = f"https://auctions.yahoo.co.jp/search/search?p={encoded}{sort_param}"
+    price_param = ""
+    if min_price is not None and int(min_price) > 0:
+        price_param += f"&aucminprice={int(min_price)}"
+    if max_price is not None and int(max_price) > 0:
+        price_param += f"&aucmaxprice={int(max_price)}"
+
+    url = f"https://auctions.yahoo.co.jp/search/search?p={encoded}{sort_param}{price_param}"
     headers = {
         "User-Agent": USER_AGENTS[0],
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -633,12 +640,19 @@ def search_yahoo_auctions(query: str, limit: int = 12, sort: str = "default") ->
         items_raw = data.get("props", {}).get("pageProps", {}).get("initialState", {}).get("search", {}).get("items", {}).get("listing", {}).get("items", [])
 
         results = []
-        for it in items_raw[:limit]:
+        for it in items_raw:
+            if len(results) >= limit:
+                break
+
             auc_id = it.get("auctionId")
             if not auc_id:
                 continue
 
             price = int(it.get("price") or it.get("buyNowPrice") or 0)
+            if min_price is not None and int(min_price) > 0 and price < int(min_price):
+                continue
+            if max_price is not None and int(max_price) > 0 and price > int(max_price):
+                continue
             img = it.get("imageUrl") or ""
             clean_img = re.sub(r'^https://auc-pctr\.c\.yimg\.jp/i/', 'https://', img).split('?')[0]
 
@@ -733,10 +747,12 @@ def search_yahoo_auctions(query: str, limit: int = 12, sort: str = "default") ->
                 ship = 750 if any(k in t_low for k in ['laptop', 'ノートpc', 'ノートパソコン', 'パソコン', 'pc', '15.6', '13.3', '14.0', 'ps5', 'playstation 5', 'ps4']) else 210
                 net_profit = target_sell - total_procurement - fee - ship
                 is_overpriced = bool(net_profit < 0)
+                profit_margin = round((net_profit / target_sell) * 100, 1) if target_sell > 0 else 0.0
             else:
                 target_sell = 0
                 net_profit = None
                 is_overpriced = False
+                profit_margin = 0.0
 
             results.append({
                 "auction_id": auc_id,
@@ -750,6 +766,7 @@ def search_yahoo_auctions(query: str, limit: int = 12, sort: str = "default") ->
                 "url": f"https://page.auctions.yahoo.co.jp/jp/auction/{auc_id}",
                 "target_sell_price": target_sell,
                 "estimated_profit": net_profit,
+                "profit_margin": profit_margin,
                 "flea_sold_count": flea_sample_count,
                 "flea_min": flea_min,
                 "flea_max": flea_max,
