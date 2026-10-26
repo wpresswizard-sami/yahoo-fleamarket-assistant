@@ -523,6 +523,15 @@ def scrape_yahoo_auction(url_or_id: str) -> Dict[str, Any]:
         except Exception:
             flea_stats = None
 
+        raw_target = (flea_stats.get("avg_sold_price") if flea_stats and flea_stats.get("avg_sold_price", 0) > 0 else 0)
+        if raw_target > 0:
+            if cond_analysis["junk"]["is_junk"]:
+                raw_target = max(round(raw_target * 0.30), 500)
+            elif cond_analysis["box"]["has_box"] is True:
+                raw_target = round(raw_target * 1.05)
+            elif cond_analysis["box"]["has_box"] is False:
+                raw_target = round(raw_target * 0.95)
+
         return {
             "success": True,
             "auction_id": auc_id,
@@ -538,7 +547,7 @@ def scrape_yahoo_auction(url_or_id: str) -> Dict[str, Any]:
             "flea_query": extract_main_flea_keyword(title),
             "box_impact": cond_analysis["box"]["impact"],
             "flea_stats": flea_stats,
-            "target_sell_price": (flea_stats.get("avg_sold_price") if flea_stats and flea_stats.get("avg_sold_price", 0) > 0 else 0),
+            "target_sell_price": raw_target,
             "is_junk": cond_analysis["junk"]["is_junk"],
             "junk_reasons": cond_analysis["junk"]["reasons"],
             "defects": cond_analysis["defects"],
@@ -736,7 +745,7 @@ def search_yahoo_auctions(query: str, limit: int = 12, sort: str = "default", mi
 
             if has_flea_data and target_sell > 0:
                 if cond_meta["junk"]["is_junk"]:
-                    target_sell = max(round(target_sell * 0.70), 500)
+                    target_sell = max(round(target_sell * 0.30), 500)
                 elif cond_meta["box"]["has_box"] is True:
                     target_sell = round(target_sell * 1.05)
                 elif cond_meta["box"]["has_box"] is False:
