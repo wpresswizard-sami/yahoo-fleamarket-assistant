@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "Yahoo! Auction to Flea Market Reseller (Helium 10 Style)",
+  "version": "1.0.0",
+  "description": "Helium 10 style X-Ray & live profit calculator overlay for Yahoo! Auctions Japan to PayPay Flea Market / Mercari.",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://auctions.yahoo.co.jp/*",
+    "https://page.auctions.yahoo.co.jp/*",
+    "http://127.0.0.1:8000/*",
+    "https://*.trycloudflare.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Yahoo! Reseller X-Ray",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://auctions.yahoo.co.jp/*",
+        "https://page.auctions.yahoo.co.jp/*"
+      ],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_end"
+    }
+  ]
+}

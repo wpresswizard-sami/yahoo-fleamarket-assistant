@@ -1,0 +1,264 @@
+/* Yahoo! Reseller Assistant - Popup CSS */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  width: 380px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: #f8fafc;
+  color: #0f172a;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.yah-popup-container {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Header */
+.yah-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 12px;
+}
+
+.yah-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.yah-logo-icon {
+  font-size: 20px;
+  background: #f97316;
+  color: #fff;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(249, 115, 22, 0.3);
+}
+
+.yah-logo-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+}
+
+.yah-logo-subtitle {
+  font-size: 10px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.yah-status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.yah-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #cbd5e1;
+}
+
+.yah-status.yah-online {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.yah-status.yah-online .yah-status-dot {
+  background: #22c55e;
+}
+
+/* Buttons */
+.yah-btn-primary {
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.35);
+  transition: all 0.15s ease;
+}
+
+.yah-btn-primary:hover {
+  background: linear-gradient(135deg, #fb923c 0%, #ea580c 100%);
+  transform: translateY(-1px);
+}
+
+.yah-help-text {
+  font-size: 11px;
+  color: #64748b;
+  text-align: center;
+  margin-top: 6px;
+}
+
+/* Card Container */
+.yah-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.yah-card-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 10px;
+}
+
+/* Calculator Inputs */
+.yah-calc-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.yah-field label {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+
+.yah-input-wrap {
+  display: flex;
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 0 8px;
+}
+
+.yah-input-wrap span {
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.yah-input-wrap input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 6px 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+  outline: none;
+}
+
+.yah-calc-results {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f1f5f9;
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+.yah-result-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.yah-r-lbl {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.yah-r-val {
+  font-size: 14px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.yah-r-val.yah-green {
+  color: #16a34a;
+}
+
+/* Category ROI List */
+.yah-category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.yah-cat-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.yah-cat-roi {
+  font-weight: 700;
+  color: #ea580c;
+  background: #fff7ed;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+/* Footer */
+.yah-popup-footer {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 10px;
+}
+
+.yah-btn-outline {
+  padding: 8px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.yah-btn-outline:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}

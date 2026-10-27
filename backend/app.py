@@ -152,6 +152,9 @@ class SellabilityRequest(BaseModel):
     bids: Optional[int] = 0
     is_ending_soon: Optional[bool] = False
 
+class ExtensionAnalyzeRequest(BaseModel):
+    items: List[Dict[str, Any]] = []
+
 # API Endpoints
 @app.post("/api/search")
 def api_search(req: SearchRequest):
@@ -194,6 +197,92 @@ def api_category_insights(budget: Optional[int] = None):
     return {
         "categories": get_category_profit_insights(),
         "budget_advice": get_budget_recommendations(budget)
+    }
+
+@app.post("/api/extension/analyze-items")
+def api_extension_analyze_items(req: ExtensionAnalyzeRequest):
+    """
+    Blazing-fast Helium 10 style batch analyzer for the Chrome Extension.
+    Evaluates up to 50 Yahoo Auction items extracted directly from the user's active page,
+    calculates real Flea Market targets, net profits, box & junk conditions.
+    """
+    from backend.market_radar import get_flea_market_real_sold_stats, calculate_sellability
+    from backend.scraper import analyze_condition_and_defects, extract_main_flea_keyword
+    import urllib.parse
+
+    analyzed_items = []
+    for it in req.items[:50]:
+        title = it.get("title", "")
+        auc_id = it.get("auction_id") or it.get("auctionId", "")
+        price = int(it.get("price", 0))
+        shipping = int(it.get("shipping_fee", 0) or it.get("shippingFee", 0))
+        img = it.get("image", "") or it.get("imageUrl", "")
+        bids = int(it.get("bids", 0) or it.get("bidCount", 0))
+        left_sec = it.get("left_seconds") or it.get("leftTime")
+        is_ending_soon = bool(left_sec is not None and 0 < float(left_sec) < 7200)
+
+        cond_meta = analyze_condition_and_defects(title=title)
+        clean_kw = extract_main_flea_keyword(title)
+
+        # Real Flea Market Target
+        flea_stats = get_flea_market_real_sold_stats(title, max_pages=1)
+        target_sell = flea_stats.get("avg_sold_price", 0) if (flea_stats and flea_stats.get("avg_sold_price", 0) > 0) else 0
+
+        if target_sell > 0:
+            if cond_meta["junk"]["is_junk"]:
+                target_sell = max(round(target_sell * 0.30), 500)
+            elif cond_meta["box"]["has_box"] is True:
+                target_sell = round(target_sell * 1.05)
+            elif cond_meta["box"]["has_box"] is False:
+                target_sell = round(target_sell * 0.95)
+
+            total_cost = price + shipping
+            fee = round(target_sell * 0.05)
+            t_low = title.lower()
+            ship_out = 750 if any(k in t_low for k in ['laptop', 'ノートpc', 'ノートパソコン', 'パソコン', 'pc', '15.6', '13.3', '14.0', 'ps5', 'ps4']) else 210
+            net_profit = target_sell - total_cost - fee - ship_out
+            margin = round((net_profit / target_sell) * 100, 1) if target_sell > 0 else 0.0
+            is_profitable = bool(net_profit >= 1000 and not cond_meta["junk"]["is_junk"])
+        else:
+            net_profit = None
+            margin = 0.0
+            is_profitable = False
+
+        sellability = calculate_sellability(
+            query_or_title=title,
+            buy_price=price,
+            target_sell_price=target_sell,
+            bids_count=bids,
+            is_ending_soon=is_ending_soon
+        )
+
+        analyzed_items.append({
+            "auction_id": auc_id,
+            "title": title,
+            "clean_title": clean_kw,
+            "buy_price": price,
+            "shipping_fee": shipping,
+            "total_procurement": price + shipping,
+            "target_sell_price": target_sell,
+            "estimated_profit": net_profit,
+            "profit_margin": margin,
+            "is_profitable": is_profitable,
+            "has_box": cond_meta["box"]["has_box"],
+            "box_badge": cond_meta["box"]["badge_text"],
+            "is_junk": cond_meta["junk"]["is_junk"],
+            "junk_reasons": cond_meta["junk"]["reasons"],
+            "has_damage": cond_meta["has_damage"],
+            "image": img,
+            "bids": bids,
+            "sellability": sellability,
+            "paypay_search_url": f"https://paypayfleamarket.yahoo.co.jp/search/{urllib.parse.quote(clean_kw)}?sold=1"
+        })
+
+    return {
+        "success": True,
+        "count": len(analyzed_items),
+        "profitable_count": sum(1 for x in analyzed_items if x.get("is_profitable")),
+        "items": analyzed_items
     }
 
 @app.post("/api/auto-deals")

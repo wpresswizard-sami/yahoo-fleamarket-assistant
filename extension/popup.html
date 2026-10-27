@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Yahoo! Reseller X-Ray</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="yah-popup-container">
+    <!-- Header -->
+    <div class="yah-popup-header">
+      <div class="yah-logo">
+        <span class="yah-logo-icon">⚡</span>
+        <div>
+          <div class="yah-logo-title">Yahoo! Reseller X-Ray</div>
+          <div class="yah-logo-subtitle">Helium 10 for Yahoo Auctions Japan</div>
+        </div>
+      </div>
+      <div class="yah-status" id="yah-server-status">
+        <span class="yah-status-dot"></span> <span id="yah-status-text">Checking...</span>
+      </div>
+    </div>
+
+    <!-- Quick Action: Launch X-Ray -->
+    <div class="yah-section">
+      <button class="yah-btn-primary" id="yah-btn-launch-xray">
+        <span>⚡ Launch X-Ray on Active Tab</span>
+      </button>
+      <div class="yah-help-text">Click when browsing any Yahoo Auctions search or category page.</div>
+    </div>
+
+    <!-- Quick Calculator -->
+    <div class="yah-section yah-card">
+      <div class="yah-card-title">🧮 Instant Profit Calculator</div>
+      <div class="yah-calc-inputs">
+        <div class="yah-field">
+          <label>Buy Price (落札価格)</label>
+          <div class="yah-input-wrap">
+            <span>¥</span>
+            <input type="number" id="calc-buy" placeholder="10,000" value="10000">
+          </div>
+        </div>
+        <div class="yah-field">
+          <label>Flea Target (フリマ相場)</label>
+          <div class="yah-input-wrap">
+            <span>¥</span>
+            <input type="number" id="calc-target" placeholder="18,000" value="18000">
+          </div>
+        </div>
+      </div>
+      <div class="yah-calc-results" id="calc-results">
+        <div class="yah-result-pill">
+          <span class="yah-r-lbl">Net Profit:</span>
+          <span class="yah-r-val yah-green" id="calc-net-profit">+¥6,090</span>
+        </div>
+        <div class="yah-result-pill">
+          <span class="yah-r-lbl">ROI Margin:</span>
+          <span class="yah-r-val" id="calc-margin">33.8%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Category ROI Insights -->
+    <div class="yah-section">
+      <div class="yah-card-title">📈 Top Category Profit Margins</div>
+      <div class="yah-category-list">
+        <div class="yah-cat-item">
+          <span>🧸 Anime & Collectibles (151)</span>
+          <span class="yah-cat-roi">35% - 50% ROI</span>
+        </div>
+        <div class="yah-cat-item">
+          <span>🎮 Retro & Consoles (PS4/Switch)</span>
+          <span class="yah-cat-roi">30% - 45% ROI</span>
+        </div>
+        <div class="yah-cat-item">
+          <span>💻 Business Laptops (CF-SZ6)</span>
+          <span class="yah-cat-roi">30% - 40% ROI</span>
+        </div>
+        <div class="yah-cat-item">
+          <span>⌚ Japanese Watches (G-Shock)</span>
+          <span class="yah-cat-roi">25% - 35% ROI</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer Links -->
+    <div class="yah-popup-footer">
+      <button class="yah-btn-outline" id="yah-btn-open-dashboard">🖥️ Full Web App</button>
+      <button class="yah-btn-outline" id="yah-btn-open-yahoo">🔍 Yahoo Auctions</button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
