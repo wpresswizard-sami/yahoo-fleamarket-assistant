@@ -100,41 +100,55 @@ async function loadQuickDeals() {
 
 // 4. Setup Button Listeners
 function setupActionButtons() {
-  // Launch X-Ray on Active Tab
-  document.getElementById("yah-btn-launch-xray").addEventListener("click", async () => {
-    try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (!tab || !tab.id) return;
+  const launchBtn = document.getElementById("yah-btn-launch-xray");
 
-      const isYahoo = tab.url && tab.url.includes("auctions.yahoo.co.jp");
-      if (!isYahoo) {
-        chrome.tabs.update(tab.id, { url: "https://auctions.yahoo.co.jp" });
+  launchBtn.addEventListener("click", async () => {
+    launchBtn.innerHTML = `<span>⏳ Opening X-Ray...</span>`;
+
+    try {
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tabs || !tabs[0] || !tabs[0].id) {
         window.close();
         return;
       }
+      const activeTab = tabs[0];
+      const isYahoo = activeTab.url && activeTab.url.includes("auctions.yahoo.co.jp");
 
-      // 1. Programmatically inject content.css & content.js into active tab
-      try {
-        await chrome.scripting.insertCSS({
-          target: { tabId: tab.id },
-          files: ["content.css"]
-        });
-        await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          files: ["content.js"]
-        });
-      } catch (err) {
-        // Script already injected or frame issue
-      }
-
-      // 2. Send open_xray message
-      setTimeout(() => {
-        chrome.tabs.sendMessage(tab.id, { action: "open_xray" }, () => {
+      if (!isYahoo) {
+        // If not on Yahoo Auctions, open Yahoo Auctions in active tab
+        chrome.tabs.update(activeTab.id, { url: "https://auctions.yahoo.co.jp" }, () => {
+          if (chrome.runtime.lastError) {}
           window.close();
         });
-      }, 120);
+        return;
+      }
 
-    } catch (e) {
+      // 1. Ensure content script is actively injected into tab
+      if (chrome.scripting) {
+        try {
+          await chrome.scripting.insertCSS({
+            target: { tabId: activeTab.id },
+            files: ["content.css"]
+          });
+        } catch (e) {}
+
+        try {
+          await chrome.scripting.executeScript({
+            target: { tabId: activeTab.id },
+            files: ["content.js"]
+          });
+        } catch (e) {}
+      }
+
+      // 2. Send message to open modal
+      setTimeout(() => {
+        chrome.tabs.sendMessage(activeTab.id, { action: "open_xray" }, () => {
+          if (chrome.runtime.lastError) {}
+          window.close();
+        });
+      }, 100);
+
+    } catch (err) {
       window.close();
     }
   });

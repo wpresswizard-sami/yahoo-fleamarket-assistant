@@ -10,6 +10,18 @@
   let currentFilter = "all"; // "all", "profitable", "box", "nojunk"
   let isScanning = false;
 
+  function safeAppend(el) {
+    if (document.body) {
+      document.body.appendChild(el);
+    } else if (document.documentElement) {
+      document.documentElement.appendChild(el);
+    } else {
+      window.addEventListener("DOMContentLoaded", () => {
+        if (document.body) document.body.appendChild(el);
+      });
+    }
+  }
+
   // Initialize once DOM is ready
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", init);
@@ -103,7 +115,9 @@
 
       // 3. Update extension toolbar badge
       try {
-        chrome.runtime.sendMessage({ action: "update_badge", count: profitableCount });
+        chrome.runtime.sendMessage({ action: "update_badge", count: profitableCount }, () => {
+          if (chrome.runtime.lastError) {}
+        });
       } catch (e) {
         // Background script not connected
       }
@@ -376,7 +390,7 @@
       openXrayModal();
     });
 
-    document.body.appendChild(btn);
+    safeAppend(btn);
   }
 
   function updateFloatingButtonText(profitableCount) {
@@ -468,8 +482,8 @@
       </div>
     `;
 
-    document.body.appendChild(backdrop);
-    document.body.appendChild(modal);
+    safeAppend(backdrop);
+    safeAppend(modal);
 
     document.getElementById("yah-close-xray-btn").addEventListener("click", closeXrayModal);
     document.getElementById("yah-export-csv-btn").addEventListener("click", exportToCsv);
