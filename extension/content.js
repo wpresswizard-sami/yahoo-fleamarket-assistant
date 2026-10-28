@@ -488,14 +488,52 @@
     });
   }
 
-  function openXrayModal() {
+  async function openXrayModal() {
     injectXrayModal();
-    updateXrayStats();
-    renderXrayTable();
     const backdrop = document.getElementById("yah-xray-backdrop");
     const modal = document.getElementById("yah-xray-modal");
     if (backdrop) backdrop.classList.add("yah-active");
     if (modal) modal.classList.add("yah-active");
+
+    if (analyzedDeals.length === 0) {
+      const raw = extractItemsFromPage();
+      if (raw && raw.length > 0) {
+        analyzedDeals = await evaluateItems(raw);
+      } else {
+        try {
+          const resp = await fetch(`${BACKEND_URL}/api/auto-deals`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ category: "all", min_profit: 1000, limit: 16 })
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            if (data.deals && data.deals.length > 0) {
+              analyzedDeals = data.deals.map(d => ({
+                auction_id: d.auction_id,
+                title: d.title,
+                clean_title: d.title,
+                buy_price: d.buy_price,
+                shipping_fee: d.shipping_fee || 0,
+                total_procurement: d.total_procurement || d.buy_price,
+                target_sell_price: d.target_sell_price,
+                estimated_profit: d.estimated_profit,
+                profit_margin: d.profit_margin,
+                is_profitable: true,
+                has_box: d.has_box,
+                is_junk: false,
+                image: d.image,
+                sellability: d.sellability,
+                paypay_search_url: `https://paypayfleamarket.yahoo.co.jp/search/${encodeURIComponent(d.title.slice(0, 20))}?sold=1`
+              }));
+            }
+          }
+        } catch (e) {}
+      }
+    }
+
+    updateXrayStats();
+    renderXrayTable();
   }
 
   function closeXrayModal() {

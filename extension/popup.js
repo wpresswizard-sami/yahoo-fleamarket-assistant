@@ -6,6 +6,7 @@ document.addEventListener("DOMContentLoaded", () => {
   checkBackendHealth();
   setupCalculator();
   setupActionButtons();
+  loadQuickDeals();
 });
 
 // 1. Check if local FastAPI server is running
@@ -65,27 +66,77 @@ function setupCalculator() {
   recalculate();
 }
 
-// 3. Setup Button Listeners
-function setupActionButtons() {
-  // Launch X-Ray on Active Tab (Never open new tab!)
-  document.getElementById("yah-btn-launch-xray").addEventListener("click", () => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (!tabs[0] || !tabs[0].id) return;
-      const activeTab = tabs[0];
-      const isYahoo = activeTab.url && activeTab.url.includes("auctions.yahoo.co.jp");
+// 3. Load Quick Deals into popup if available
+async function loadQuickDeals() {
+  try {
+    const resp = await fetch(`${BACKEND_URL}/api/auto-deals`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ category: "gaming", min_profit: 2000, limit: 3 })
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data.deals && data.deals.length > 0) {
+        const sec = document.getElementById("yah-popup-deals-section");
+        const list = document.getElementById("yah-popup-deals-list");
+        if (sec && list) {
+          sec.style.display = "block";
+          document.getElementById("yah-popup-deals-count").innerText = `${data.count} found`;
+          list.innerHTML = data.deals.map(d => `
+            <div style="display:flex; align-items:center; justify-content:space-between; background:#fff; border:1px solid #e2e8f0; border-radius:6px; padding:6px 10px; font-size:11px;">
+              <div style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600;">
+                ${d.title}
+              </div>
+              <div style="color:#16a34a; font-weight:800; white-space:nowrap;">
+                +¥${d.estimated_profit.toLocaleString()}
+              </div>
+            </div>
+          `).join("");
+        }
+      }
+    }
+  } catch (e) {}
+}
 
-      if (isYahoo) {
-        // Send message to active Yahoo Auctions tab
-        chrome.tabs.sendMessage(activeTab.id, { action: "open_xray" }, () => {
-          // Close popup so user sees X-Ray modal right on Yahoo Auctions screen!
+// 4. Setup Button Listeners
+function setupActionButtons() {
+  // Launch X-Ray on Active Tab
+  document.getElementById("yah-btn-launch-xray").addEventListener("click", async () => {
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab || !tab.id) return;
+
+      const isYahoo = tab.url && tab.url.includes("auctions.yahoo.co.jp");
+      if (!isYahoo) {
+        chrome.tabs.update(tab.id, { url: "https://auctions.yahoo.co.jp" });
+        window.close();
+        return;
+      }
+
+      // 1. Programmatically inject content.css & content.js into active tab
+      try {
+        await chrome.scripting.insertCSS({
+          target: { tabId: tab.id },
+          files: ["content.css"]
+        });
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ["content.js"]
+        });
+      } catch (err) {
+        // Script already injected or frame issue
+      }
+
+      // 2. Send open_xray message
+      setTimeout(() => {
+        chrome.tabs.sendMessage(tab.id, { action: "open_xray" }, () => {
           window.close();
         });
-      } else {
-        // Active tab is not Yahoo Auctions - redirect active tab to Yahoo Auctions
-        chrome.tabs.update(activeTab.id, { url: "https://auctions.yahoo.co.jp" });
-        window.close();
-      }
-    });
+      }, 120);
+
+    } catch (e) {
+      window.close();
+    }
   });
 
   // Open Full Web App Dashboard
