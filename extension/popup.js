@@ -67,18 +67,23 @@ function setupCalculator() {
 
 // 3. Setup Button Listeners
 function setupActionButtons() {
-  // Launch X-Ray on Active Tab
+  // Launch X-Ray on Active Tab (Never open new tab!)
   document.getElementById("yah-btn-launch-xray").addEventListener("click", () => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0] && tabs[0].id) {
-        chrome.tabs.sendMessage(tabs[0].id, { action: "toggle_xray" }, (response) => {
-          if (chrome.runtime.lastError) {
-            // Content script not loaded yet (e.g. user is not on Yahoo Auctions)
-            chrome.tabs.create({ url: "https://auctions.yahoo.co.jp" });
-          } else {
-            window.close(); // Close popup so user sees X-Ray modal
-          }
+      if (!tabs[0] || !tabs[0].id) return;
+      const activeTab = tabs[0];
+      const isYahoo = activeTab.url && activeTab.url.includes("auctions.yahoo.co.jp");
+
+      if (isYahoo) {
+        // Send message to active Yahoo Auctions tab
+        chrome.tabs.sendMessage(activeTab.id, { action: "open_xray" }, () => {
+          // Close popup so user sees X-Ray modal right on Yahoo Auctions screen!
+          window.close();
         });
+      } else {
+        // Active tab is not Yahoo Auctions - redirect active tab to Yahoo Auctions
+        chrome.tabs.update(activeTab.id, { url: "https://auctions.yahoo.co.jp" });
+        window.close();
       }
     });
   });

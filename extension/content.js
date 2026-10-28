@@ -1,12 +1,14 @@
 /**
  * Yahoo! Auction to Flea Market Reseller Assistant - Helium 10 Style Content Script
  * Injects inline profit badges, floating X-Ray trigger, and slide-over arbitrage modal.
+ * Supports: Homepage, Search Results, Recommendations, Categories, and Single Item Pages.
  */
 
 (function () {
   const BACKEND_URL = "http://127.0.0.1:8000";
   let analyzedDeals = [];
   let currentFilter = "all"; // "all", "profitable", "box", "nojunk"
+  let isScanning = false;
 
   // Initialize once DOM is ready
   if (document.readyState === "loading") {
@@ -16,113 +18,225 @@
   }
 
   function init() {
-    const isSearchPage = window.location.href.includes("auctions.yahoo.co.jp/search") || 
-                         window.location.href.includes("auctions.yahoo.co.jp/category");
     const isItemPage = window.location.href.includes("page.auctions.yahoo.co.jp/jp/auction/");
 
-    if (isSearchPage) {
-      handleSearchPage();
-    } else if (isItemPage) {
+    if (isItemPage) {
       handleItemDetailPage();
+    } else {
+      handleBrowsePage();
+    }
+
+    // Always listen for popup messages
+    setupMessageListener();
+  }
+
+  // =========================================================================
+  // MESSAGE LISTENER (Popup Communication)
+  // =========================================================================
+  function setupMessageListener() {
+    if (chrome.runtime && chrome.runtime.onMessage) {
+      chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+        if (msg.action === "toggle_xray" || msg.action === "open_xray") {
+          // If modal does not exist yet, inject it
+          injectXrayModal();
+          
+          if (analyzedDeals.length === 0) {
+            // Run quick scan then open
+            runBrowseScan().then(() => {
+              openXrayModal();
+            });
+          } else {
+            openXrayModal();
+          }
+          sendResponse({ status: "opened", count: analyzedDeals.length });
+          return true; // Keep message channel open for async response
+        }
+      });
     }
   }
 
   // =========================================================================
-  // SEARCH PAGE HANDLER (Helium 10 X-Ray)
+  // BROWSE & SEARCH PAGE HANDLER (Helium 10 X-Ray)
   // =========================================================================
-  async function handleSearchPage() {
-    const rawItems = extractItemsFromPage();
-    if (!rawItems || rawItems.length === 0) return;
+  async function handleBrowsePage() {
+    // 1. Always inject Floating X-Ray Trigger Button
+    injectFloatingXrayButton();
 
-    // Evaluate items via local FastAPI backend or local fallback
-    analyzedDeals = await evaluateItems(rawItems);
-
-    // 1. Inject Inline Badges under each product card
-    injectInlineBadges(analyzedDeals);
-
-    // 2. Inject Floating X-Ray Trigger Button
-    injectFloatingXrayButton(analyzedDeals);
-
-    // 3. Inject X-Ray Modal into the DOM
+    // 2. Always inject X-Ray Modal into DOM so it's ready
     injectXrayModal();
 
-    // 4. Update extension badge counter
-    const profitableCount = analyzedDeals.filter(d => d.is_profitable).length;
+    // 3. Run initial scan of products on page
+    await runBrowseScan();
+
+    // 4. Setup MutationObserver to scan dynamically loaded or lazy-loaded cards
+    let debounceTimer = null;
+    const observer = new MutationObserver(() => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        runBrowseScan(true); // silent background update
+      }, 1200);
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+
+  async function runBrowseScan(isSilent = false) {
+    if (isScanning) return;
+    isScanning = true;
+
     try {
-      chrome.runtime.sendMessage({ action: "update_badge", count: profitableCount });
-    } catch (e) {
-      // Ignore if background listener is disconnected
+      const rawItems = extractItemsFromPage();
+      if (!rawItems || rawItems.length === 0) {
+        updateFloatingButtonText(0);
+        return;
+      }
+
+      // Evaluate items via local FastAPI backend or local fallback
+      analyzedDeals = await evaluateItems(rawItems);
+
+      // 1. Inject Inline Badges under each product card
+      injectInlineBadges(analyzedDeals);
+
+      // 2. Update floating button count
+      const profitableCount = analyzedDeals.filter(d => d.is_profitable).length;
+      updateFloatingButtonText(profitableCount);
+
+      // 3. Update extension toolbar badge
+      try {
+        chrome.runtime.sendMessage({ action: "update_badge", count: profitableCount });
+      } catch (e) {
+        // Background script not connected
+      }
+
+      // If modal is currently open, refresh the table live!
+      const modal = document.getElementById("yah-xray-modal");
+      if (modal && modal.classList.contains("yah-active")) {
+        updateXrayStats();
+        renderXrayTable();
+      }
+    } finally {
+      isScanning = false;
     }
   }
 
-  // Extract items from Yahoo Auctions __NEXT_DATA__ or DOM
+  // =========================================================================
+  // ROBUST BILINGUAL ITEM EXTRACTION (Next.js JSON + DOM Anchors)
+  // =========================================================================
   function extractItemsFromPage() {
-    // 1. Attempt extracting from __NEXT_DATA__ JSON script
+    const itemsMap = new Map();
+
+    // 1. Attempt extracting from __NEXT_DATA__ JSON script (Search results)
     const nextScript = document.getElementById("__NEXT_DATA__");
     if (nextScript) {
       try {
         const nextData = JSON.parse(nextScript.textContent);
         const listing = nextData?.props?.pageProps?.initialState?.search?.items?.listing?.items;
         if (Array.isArray(listing) && listing.length > 0) {
-          return listing.map(it => ({
-            auction_id: it.auctionId,
-            title: it.title,
-            price: parseInt(it.price || it.buyNowPrice || 0, 10),
-            shipping_fee: parseInt(it.currentPriceShippingFee || it.buyNowPriceShippingFee || 0, 10),
-            image: it.imageUrl ? it.imageUrl.replace(/^https:\/\/auc-pctr\.c\.yimg\.jp\/i\//, "https://").split("?")[0] : "",
-            bids: parseInt(it.bidCount || 0, 10),
-            left_seconds: it.leftTime ? parseFloat(it.leftTime) : null,
-            item_condition: it.itemCondition || ""
-          }));
+          listing.forEach(it => {
+            if (it.auctionId) {
+              itemsMap.set(it.auctionId, {
+                auction_id: it.auctionId,
+                title: it.title || "",
+                price: parseInt(it.price || it.buyNowPrice || 0, 10),
+                shipping_fee: parseInt(it.currentPriceShippingFee || it.buyNowPriceShippingFee || 0, 10),
+                image: it.imageUrl ? it.imageUrl.replace(/^https:\/\/auc-pctr\.c\.yimg\.jp\/i\//, "https://").split("?")[0] : "",
+                bids: parseInt(it.bidCount || 0, 10),
+                left_seconds: it.leftTime ? parseFloat(it.leftTime) : null,
+                item_condition: it.itemCondition || ""
+              });
+            }
+          });
         }
       } catch (e) {
-        console.warn("[Yahoo Reseller] Failed parsing __NEXT_DATA__, falling back to DOM parsing:", e);
+        // Fallback to DOM
       }
     }
 
-    // 2. Fallback: Parse from DOM anchors
-    const domItems = [];
-    const seenIds = new Set();
-    const anchors = document.querySelectorAll('a[href*="/jp/auction/"]');
+    // 2. DOM Parsing: Supports Homepage recommendations, Category pages, & Search cards
+    // Target any link that leads to an auction
+    const candidateAnchors = document.querySelectorAll('a[href*="/auction/"], a[href*="page.auctions.yahoo.co.jp"]');
 
-    anchors.forEach(a => {
+    candidateAnchors.forEach(a => {
       const href = a.getAttribute("href") || "";
       const match = href.match(/\/auction\/([a-zA-Z0-9]+)/);
       if (!match) return;
       const aucId = match[1];
-      if (seenIds.has(aucId)) return;
-      seenIds.add(aucId);
 
-      // Find closest card container
-      const card = a.closest("li") || a.closest(".Product") || a.parentElement;
-      const title = a.textContent.trim() || card?.innerText?.split("\n")[0] || "";
-      const priceMatch = (card?.innerText || "").match(/([0-9]{1,3}(?:,[0-9]{3})*)\s*円/);
-      const price = priceMatch ? parseInt(priceMatch[1].replace(/,/g, ""), 10) : 0;
-      const img = card?.querySelector("img")?.src || "";
-
-      if (title && price > 0) {
-        domItems.push({
-          auction_id: aucId,
-          title: title,
-          price: price,
-          shipping_fee: 0,
-          image: img,
-          bids: 0,
-          left_seconds: null
-        });
+      // If already extracted from NEXT_DATA with good title & price, skip
+      if (itemsMap.has(aucId) && itemsMap.get(aucId).price > 0 && itemsMap.get(aucId).title) {
+        return;
       }
+
+      // Find product card container
+      const card = a.closest("li") || a.closest(".Product") || a.closest(".Item") || a.closest('[class*="item"]') || a.closest('[class*="card"]') || a.parentElement;
+      if (!card) return;
+
+      const cardText = card.innerText || "";
+
+      // Bilingual Price Extraction: Supports '68,700 yen', '1,780円', '¥1,000', 'the current 90 yen'
+      const price = extractBilingualPrice(cardText);
+      if (price <= 0) return;
+
+      // Title Extraction: From anchor title, text, or img alt
+      let title = a.getAttribute("title") || a.textContent.trim();
+      if (!title || title.length < 3 || /^\d+$/.test(title) || /detail|入札|即決|円|yen/i.test(title)) {
+        const img = a.querySelector("img") || card.querySelector("img");
+        title = img?.getAttribute("alt") || img?.getAttribute("title") || "";
+      }
+      if (!title || title.length < 3) {
+        // Look for title headings in card
+        const heading = card.querySelector('h1, h2, h3, h4, [class*="title"], [class*="Title"]');
+        if (heading && heading.textContent.trim().length > 3) {
+          title = heading.textContent.trim();
+        }
+      }
+
+      if (!title || title.length < 2) return;
+
+      // Image Extraction
+      const imgEl = a.querySelector("img") || card.querySelector("img");
+      const img = imgEl?.src || imgEl?.getAttribute("data-src") || "";
+
+      itemsMap.set(aucId, {
+        auction_id: aucId,
+        title: title.replace(/\s+/g, " ").trim(),
+        price: price,
+        shipping_fee: (/送料無料|free\s*shipping/i.test(cardText) ? 0 : 250),
+        image: img,
+        bids: 0,
+        left_seconds: null
+      });
     });
 
-    return domItems;
+    return Array.from(itemsMap.values());
   }
 
-  // Send to FastAPI or evaluate locally
+  // Bilingual price extractor (Japanese & English Translated)
+  function extractBilingualPrice(text) {
+    if (!text) return 0;
+
+    // Suffix format: '68,700 yen' or '1,780円' or '1780 yen'
+    const m1 = text.match(/([0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)\s*(?:円|yen)/i);
+    if (m1) return parseInt(m1[1].replace(/,/g, ""), 10);
+
+    // Prefix format: '¥1,780' or '￥68,700'
+    const m2 = text.match(/(?:¥|￥)\s*([0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)/);
+    if (m2) return parseInt(m2[1].replace(/,/g, ""), 10);
+
+    // Context format: 'the current 1,780' or 'Buy It Now 68,700' or '現在 1,780'
+    const m3 = text.match(/(?:current|buy\s*it\s*now|現在|即決|価格|落札)[^0-9\n]{0,10}([0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)/i);
+    if (m3) return parseInt(m3[1].replace(/,/g, ""), 10);
+
+    return 0;
+  }
+
+  // Evaluate items via FastAPI or standalone heuristic
   async function evaluateItems(items) {
     try {
       const resp = await fetch(`${BACKEND_URL}/api/extension/analyze-items`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: items })
+        body: JSON.stringify({ items: items.slice(0, 50) })
       });
       if (resp.ok) {
         const data = await resp.json();
@@ -131,7 +245,7 @@
         }
       }
     } catch (e) {
-      console.log("[Yahoo Reseller] Backend server not reachable, using standalone heuristic evaluation.");
+      console.log("[Yahoo Reseller] Using fast local evaluation.");
     }
 
     // Standalone fallback evaluation engine
@@ -141,20 +255,22 @@
       const tLow = title.toLowerCase();
 
       // Junk detection
-      const isJunk = /ジャンク|junk|故障|不動|部品取り|動作未確認|通電のみ|割れ/.test(tLow);
-      const hasBox = /箱付き|箱あり|元箱あり|元箱付き|化粧箱|外箱/.test(tLow) ? true : (/本体のみ|箱なし|元箱なし/.test(tLow) ? false : null);
+      const isJunk = /ジャンク|junk|故障|不動|部品取り|動作未確認|通電のみ|割れ|破損|難あり|液晶割れ/i.test(tLow);
+      const hasBox = /箱付き|箱あり|元箱あり|元箱付き|化粧箱|外箱/i.test(tLow) ? true : (/本体のみ|箱なし|元箱なし/i.test(tLow) ? false : null);
 
-      // Simple baselines
+      // Baselines
       let targetSell = 0;
-      if (/ps4\s*pro|cuh-7200|cuh-7100/.test(tLow)) targetSell = 23000;
-      else if (/ps4|cuh-2200|cuh-2000/.test(tLow)) targetSell = 15500;
-      else if (/有機el|oled/.test(tLow)) targetSell = 25000;
-      else if (/switch.*ライト|switch\s*lite|hdh-001/.test(tLow)) targetSell = 12500;
-      else if (/switch|スイッチ/.test(tLow)) targetSell = 15500;
-      else if (/cf-sz6|レッツノート/.test(tLow)) targetSell = 9500;
-      else if (/thinkpad.*x280/.test(tLow)) targetSell = 11000;
-      else if (/gw-m5610|g-shock.*ソーラー/.test(tLow)) targetSell = 6500;
-      else if (/151.*box.*シュリンク|未開封.*151/.test(tLow)) targetSell = 14500;
+      if (/ps4\s*pro|cuh-7200|cuh-7100/i.test(tLow)) targetSell = 23000;
+      else if (/ps4|cuh-2200|cuh-2000/i.test(tLow)) targetSell = 15500;
+      else if (/有機el|oled/i.test(tLow)) targetSell = 25000;
+      else if (/switch.*ライト|switch\s*lite|hdh-001/i.test(tLow)) targetSell = 12500;
+      else if (/switch|スイッチ/i.test(tLow)) targetSell = 15500;
+      else if (/cf-sz6|レッツノート/i.test(tLow)) targetSell = 9500;
+      else if (/thinkpad.*x280/i.test(tLow)) targetSell = 11000;
+      else if (/gw-m5610|g-shock.*ソーラー/i.test(tLow)) targetSell = 6500;
+      else if (/151.*box.*シュリンク|未開封.*151/i.test(tLow)) targetSell = 14500;
+      else if (/wii\s*u/i.test(tLow)) targetSell = 6500;
+      else if (/ps3/i.test(tLow)) targetSell = 4500;
 
       if (targetSell > 0) {
         if (isJunk) targetSell = Math.round(targetSell * 0.30);
@@ -174,25 +290,27 @@
         target_sell_price: targetSell,
         estimated_profit: profit,
         profit_margin: margin,
-        is_profitable: Boolean(profit && profit >= 1000),
+        is_profitable: Boolean(profit && profit >= 1000 && !isJunk),
         has_box: hasBox,
         box_badge: hasBox === true ? "📦 箱あり" : (hasBox === false ? "📦 本体のみ" : "📦 箱不明"),
         is_junk: isJunk,
         junk_reasons: isJunk ? ["Junk / Untested"] : [],
-        sellability: { score: 85, verdict: "🟢 High Demand", est_days_to_sell: "2 - 4 Days" },
+        sellability: { score: 85, verdict: "🟢 High Demand", est_days_to_sell: "1 - 3 Days" },
         paypay_search_url: `https://paypayfleamarket.yahoo.co.jp/search/${encodeURIComponent(title.slice(0, 20))}?sold=1`
       };
     });
   }
 
-  // 1. Inject Inline Badges under each card on search results
+  // =========================================================================
+  // 1. INLINE BADGES INJECTION (Under Each Card)
+  // =========================================================================
   function injectInlineBadges(deals) {
     const dealMap = new Map();
     deals.forEach(d => {
       if (d.auction_id) dealMap.set(d.auction_id, d);
     });
 
-    const anchors = document.querySelectorAll('a[href*="/jp/auction/"]');
+    const anchors = document.querySelectorAll('a[href*="/auction/"], a[href*="page.auctions.yahoo.co.jp"]');
     anchors.forEach(a => {
       const href = a.getAttribute("href") || "";
       const m = href.match(/\/auction\/([a-zA-Z0-9]+)/);
@@ -201,8 +319,7 @@
       const deal = dealMap.get(aid);
       if (!deal) return;
 
-      // Ensure we don't inject twice
-      const parentCard = a.closest("li") || a.closest(".Product") || a.parentElement;
+      const parentCard = a.closest("li") || a.closest(".Product") || a.closest(".Item") || a.parentElement;
       if (!parentCard || parentCard.querySelector(".yah-inline-badge")) return;
 
       const badgeEl = document.createElement("div");
@@ -238,21 +355,21 @@
         </div>
       `;
 
-      // Insert badge right before or inside parent
       a.parentNode.insertBefore(badgeEl, a.nextSibling);
     });
   }
 
-  // 2. Inject Floating X-Ray Trigger Button
-  function injectFloatingXrayButton(deals) {
+  // =========================================================================
+  // 2. FLOATING X-RAY BUTTON (Always Present on Bottom-Right)
+  // =========================================================================
+  function injectFloatingXrayButton() {
     if (document.getElementById("yah-xray-floating-btn")) return;
 
-    const profitableCount = deals.filter(d => d.is_profitable).length;
     const btn = document.createElement("div");
     btn.id = "yah-xray-floating-btn";
     btn.innerHTML = `
       <span>⚡ Yahoo X-Ray</span>
-      <span class="yah-badge-count">${profitableCount} Profitable</span>
+      <span class="yah-badge-count" id="yah-floating-count">0 Profitable</span>
     `;
 
     btn.addEventListener("click", () => {
@@ -262,7 +379,17 @@
     document.body.appendChild(btn);
   }
 
-  // 3. Inject X-Ray Slide-Over Modal
+  function updateFloatingButtonText(profitableCount) {
+    const countEl = document.getElementById("yah-floating-count");
+    if (countEl) {
+      countEl.innerText = `${profitableCount} Profitable`;
+      countEl.style.background = profitableCount > 0 ? "#10b981" : "#64748b";
+    }
+  }
+
+  // =========================================================================
+  // 3. HELIUM 10 STYLE X-RAY SLIDE-OVER MODAL
+  // =========================================================================
   function injectXrayModal() {
     if (document.getElementById("yah-xray-modal")) return;
 
@@ -344,16 +471,13 @@
     document.body.appendChild(backdrop);
     document.body.appendChild(modal);
 
-    // Event listeners
     document.getElementById("yah-close-xray-btn").addEventListener("click", closeXrayModal);
     document.getElementById("yah-export-csv-btn").addEventListener("click", exportToCsv);
 
-    // Search input
     document.getElementById("yah-xray-search").addEventListener("input", (e) => {
       renderXrayTable(e.target.value.toLowerCase());
     });
 
-    // Filter pills
     modal.querySelectorAll(".yah-filter-btn").forEach(btn => {
       btn.addEventListener("click", () => {
         modal.querySelectorAll(".yah-filter-btn").forEach(b => b.classList.remove("yah-active"));
@@ -365,6 +489,7 @@
   }
 
   function openXrayModal() {
+    injectXrayModal();
     updateXrayStats();
     renderXrayTable();
     const backdrop = document.getElementById("yah-xray-backdrop");
@@ -394,12 +519,19 @@
 
     const avgMargin = profCount > 0 ? (totalMargin / profCount).toFixed(1) : 0;
 
-    document.getElementById("yah-stat-total").innerText = total;
-    document.getElementById("yah-stat-profitable").innerText = profCount;
-    document.getElementById("yah-stat-avg-margin").innerText = `${avgMargin}%`;
-    document.getElementById("yah-stat-total-profit").innerText = `+¥${totalProfit.toLocaleString()}`;
-    document.getElementById("yah-count-all").innerText = total;
-    document.getElementById("yah-count-prof").innerText = profCount;
+    const elTotal = document.getElementById("yah-stat-total");
+    const elProf = document.getElementById("yah-stat-profitable");
+    const elAvg = document.getElementById("yah-stat-avg-margin");
+    const elTotProf = document.getElementById("yah-stat-total-profit");
+    const elCntAll = document.getElementById("yah-count-all");
+    const elCntProf = document.getElementById("yah-count-prof");
+
+    if (elTotal) elTotal.innerText = total;
+    if (elProf) elProf.innerText = profCount;
+    if (elAvg) elAvg.innerText = `${avgMargin}%`;
+    if (elTotProf) elTotProf.innerText = `+¥${totalProfit.toLocaleString()}`;
+    if (elCntAll) elCntAll.innerText = total;
+    if (elCntProf) elCntProf.innerText = profCount;
   }
 
   function renderXrayTable(searchTerm = "") {
@@ -426,7 +558,29 @@
     filtered.sort((a, b) => (b.estimated_profit || -999999) - (a.estimated_profit || -999999));
 
     if (filtered.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding: 40px; color: #64748b;">No products match your current filter.</td></tr>`;
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="10" style="text-align:center; padding: 40px; color: #64748b;">
+            <div style="font-size:16px; font-weight:700; margin-bottom:8px; color:#1e293b;">🔍 No matching items on this view</div>
+            <div style="font-size:13px; margin-bottom:16px;">Try searching for high-turnover profitable categories:</div>
+            <div style="display:flex; justify-content:center; gap:8px; flex-wrap:wrap;">
+              <button class="yah-quick-search-btn" data-q="PS4 Pro 本体">🎮 PS4 Pro</button>
+              <button class="yah-quick-search-btn" data-q="Switch 有機EL 本体">🎮 Switch OLED</button>
+              <button class="yah-quick-search-btn" data-q="ポケモン 151 BOX">🧸 Pokemon 151</button>
+              <button class="yah-quick-search-btn" data-q="レッツノート CF-SZ6">💻 Let's note</button>
+              <button class="yah-quick-search-btn" data-q="G-SHOCK GW-M5610">⌚ G-Shock</button>
+            </div>
+          </td>
+        </tr>
+      `;
+
+      tbody.querySelectorAll(".yah-quick-search-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const q = btn.getAttribute("data-q");
+          window.location.href = `https://auctions.yahoo.co.jp/search/search?p=${encodeURIComponent(q)}`;
+        });
+      });
+
       return;
     }
 
@@ -527,19 +681,15 @@
     if (!match) return;
     const aucId = match[1];
 
-    // Find price and title from DOM
     const titleEl = document.querySelector("h1") || document.querySelector(".ProductTitle__title");
     const title = titleEl ? titleEl.textContent.trim() : "";
-    const priceEl = document.querySelector(".Price__value") || document.querySelector(".ProductPrice__price");
-    const priceText = priceEl ? priceEl.textContent.replace(/[^0-9]/g, "") : "0";
-    const price = parseInt(priceText, 10) || 0;
+    const priceEl = document.querySelector(".Price__value") || document.querySelector(".ProductPrice__price") || document.querySelector(".Price");
+    const price = extractBilingualPrice(priceEl?.innerText || document.body.innerText);
 
-    // Evaluate
     const evalList = await evaluateItems([{ auction_id: aucId, title: title, price: price }]);
     if (!evalList || evalList.length === 0) return;
     const deal = evalList[0];
 
-    // Find place to inject (above bid button or main pricing block)
     const bidBlock = document.querySelector(".ProductPrice") || document.querySelector(".Price") || document.querySelector(".ItemSub");
     if (!bidBlock) return;
 
@@ -610,13 +760,6 @@
       }
     });
   }
-
-  // Listen for popup trigger
-  chrome.runtime.onMessage?.addListener((msg) => {
-    if (msg.action === "toggle_xray") {
-      openXrayModal();
-    }
-  });
 
   function escapeHtml(str) {
     return (str || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
